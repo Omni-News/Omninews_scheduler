@@ -5,7 +5,7 @@ use crate::{
     model::{error::OmniNewsError, news::NewNews},
     news_error, news_info, news_warn,
     repository::news_repository,
-    utils::llama_util::query_llama_summarize,
+    utils::api::query_llama_summarize,
 };
 use chrono::{Duration, NaiveDateTime};
 use reqwest::Client;
