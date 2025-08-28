@@ -28,6 +28,28 @@ pub async fn insert_embedding(
     }
 }
 
+pub async fn update_embedding(
+    pool: &MySqlPool,
+    embedding: NewEmbedding,
+) -> Result<i32, sqlx::Error> {
+    let mut conn = get_db(pool).await?;
+
+    let result = query!(
+        "UPDATE embedding 
+    SET embedding_value = ?
+    WHERE channel_id = ?;",
+        embedding.embedding_value,
+        embedding.channel_id,
+    )
+    .execute(&mut *conn)
+    .await;
+
+    match result {
+        Ok(res) => Ok(res.rows_affected() as i32),
+        Err(e) => Err(e),
+    }
+}
+
 pub async fn select_all_channel_embeddings(
     pool: &MySqlPool,
 ) -> Result<Vec<Embedding>, sqlx::Error> {

@@ -7,6 +7,7 @@ use crate::{model::fcm_token::FcmTokenUser, rss_fetch_and_notification_info};
 
 use super::firebase_util::get_fcm_access_token_with_expiry;
 
+// TODO 다중 인원에게 보내는 것도 생각해보기
 pub async fn send_fcm_message(
     token: FcmTokenUser,
     title: String,

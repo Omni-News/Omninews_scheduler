@@ -6,38 +6,36 @@ use crate::{
     utils::embedding_util::EmbeddingService,
 };
 use chrono::{DateTime, NaiveDateTime};
-use rss::Item;
 use scraper::{Html, Selector};
 use sqlx::MySqlPool;
 
 pub async fn create_rss_item_and_embedding(
     pool: &MySqlPool,
     embedding_service: &EmbeddingService,
-    channel_id: i32,
-    channel_image_url: String,
-    rss_item: &mut Item,
+    rss_item: NewRssItem,
 ) -> Result<bool, OmniNewsError> {
-    let description = rss_item.description().unwrap_or("None");
+    let mut rss_item = rss_item;
+    let description = rss_item
+        .rss_description
+        .clone()
+        .unwrap_or("None".to_string());
+
     let (extracted_description, item_image_link) =
-        extract_html_to_passage_and_image_link(description);
-    rss_item.set_description(extracted_description.clone());
-    let item_image_link = use_channel_url_if_none(item_image_link, channel_image_url.clone());
+        extract_html_to_passage_and_image_link(&description);
+    rss_item.rss_description = Some(extracted_description.clone());
+    let item_image_link = use_channel_url_if_none(
+        item_image_link,
+        rss_item.rss_image_link.clone().unwrap_or_default(),
+    );
+    rss_item.rss_image_link = Some(item_image_link);
 
-    let item = match make_rss_item(channel_id, rss_item, item_image_link) {
-        Ok(item) => item,
-        Err(e) => {
-            rss_fetch_and_notification_error!("[Service] Failed to make rss item: {}", e);
-            return Err(e);
-        }
-    };
-
-    let item_id = store_rss_item(pool, item.clone()).await.unwrap();
+    let item_id = store_rss_item(pool, rss_item.clone()).await.unwrap();
 
     let sentence = format!(
         "{}\n{}\n{}",
-        item.rss_title.unwrap_or_default(),
+        rss_item.rss_title.clone().unwrap_or_default(),
         extracted_description,
-        item.rss_author.unwrap_or_default()
+        rss_item.rss_author.clone().unwrap_or_default()
     );
     let embedding = NewEmbedding {
         embedding_value: None,
@@ -79,24 +77,7 @@ fn use_channel_url_if_none(link: Option<String>, channel_image_url: String) -> S
     }
 }
 
-fn make_rss_item(
-    channel_id: i32,
-    item: &Item,
-    item_image_link: String,
-) -> Result<NewRssItem, OmniNewsError> {
-    let rss_pub_date = parse_pub_date(item.pub_date());
-    if item.title.is_none() || item.description.is_none() {
-        return Err(OmniNewsError::EmptyRssItem);
-    }
-    Ok(NewRssItem::new(
-        channel_id,
-        item,
-        rss_pub_date,
-        item_image_link,
-    ))
-}
-
-fn parse_pub_date(pub_date_str: Option<&str>) -> Option<NaiveDateTime> {
+pub fn parse_pub_date(pub_date_str: Option<&str>) -> Option<NaiveDateTime> {
     pub_date_str
         .and_then(|date_str| {
             // 1. RFC2822 형식 파싱 시도
@@ -169,9 +150,9 @@ pub async fn get_items_len_by_channel_id(
 
 pub async fn is_exist_rss_item_by_link(
     pool: &MySqlPool,
-    link: String,
+    link: &str,
 ) -> Result<bool, OmniNewsError> {
-    match rss_item_repository::is_exist_rss_item_by_link(pool, &link).await {
+    match rss_item_repository::is_exist_rss_item_by_link(pool, link).await {
         Ok(_) => Ok(true),
         Err(_) => Ok(false),
     }

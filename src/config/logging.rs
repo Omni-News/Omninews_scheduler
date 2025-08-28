@@ -80,25 +80,21 @@ pub fn load_logger() {
         .logger(
             Logger::builder()
                 .appender("annoy_file")
-                .appender("stdout")
                 .build(ANNOY_SCHEDULER, LevelFilter::Info),
         )
         .logger(
             Logger::builder()
                 .appender("news_file")
-                .appender("stdout")
                 .build(NEWS_SCHEDULER, LevelFilter::Info),
         )
         .logger(
             Logger::builder()
                 .appender("rss_info_file")
-                .appender("stdout")
                 .build(RSS_INFO_SCHEDULER, LevelFilter::Info),
         )
         .logger(
             Logger::builder()
                 .appender("rss_fetch_and_notification_file")
-                .appender("stdout")
                 .build(RSS_FETCH_AND_NOTIFICATION_SCHEDULER, LevelFilter::Info),
         );
 

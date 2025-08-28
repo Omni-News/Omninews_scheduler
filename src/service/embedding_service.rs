@@ -26,7 +26,7 @@ pub async fn create_embedding(
         Ok(res) => Ok(res),
         Err(e) => {
             rss_fetch_and_notification_error!("[Service] Failed to insert embedding: {}", e);
-            Err(OmniNewsError::EmbeddingError)
+            Err(OmniNewsError::Embedding)
         }
     }
 }
@@ -68,5 +68,25 @@ pub async fn find_all_embeddings_by(
                 Err(OmniNewsError::Database(e))
             }
         },
+    }
+}
+
+pub async fn update_embedding(
+    pool: &MySqlPool,
+    embedding_service: &EmbeddingService,
+    sentence: String,
+    mut embedding: NewEmbedding,
+) -> Result<i32, OmniNewsError> {
+    let embedding_value = embedding_sentence(embedding_service, sentence).await?;
+    let encoded_embedding_value = encode_embedding(&embedding_value);
+
+    embedding.embedding_value = Some(encoded_embedding_value);
+
+    match embedding_repository::update_embedding(pool, embedding).await {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            rss_fetch_and_notification_error!("[Service] Failed to update embedding: {}", e);
+            Err(OmniNewsError::Embedding)
+        }
     }
 }

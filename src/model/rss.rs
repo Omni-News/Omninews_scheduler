@@ -70,6 +70,7 @@ impl NewRssChannel {
         }
     }
 }
+
 impl NewRssItem {
     pub fn new(
         channel_id: i32,
