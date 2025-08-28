@@ -1,0 +1,34 @@
+services:
+  omninews-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev # 개발용 Dockerfile 사용
+    container_name: omninews_scheduler
+    ports:
+      - "1028:1028"
+    environment:
+      - ROCKET_ENV=development
+      - ROCKET_ADDRESS=0.0.0.0
+      - ROCKET_PORT=1028
+      - RUST_LOG=debug
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src:ro # 소스코드 hot-reload
+      - ./Cargo.toml:/app/Cargo.toml:ro
+      - ./Rocket.toml:/app/Rocket.toml:ro
+      - ./logs:/app/logs
+      - ./omninews_firebase_sdk.json:/app/omninews_firebase_sdk.json:ro
+      - cargo_cache:/usr/local/cargo/registry
+    networks:
+      - omninews-network
+    stdin_open: true # docker run -i
+    tty: true # docker run -t
+
+networks:
+  omninews-network:
+    external: true
+
+volumes:
+  cargo_cache:
+  target_cache:
