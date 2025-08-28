@@ -32,11 +32,9 @@ struct TokenResponse {
 }
 
 pub async fn get_fcm_access_token_with_expiry() -> Result<(String, u64), Box<dyn Error>> {
-    // TODO 1시간 지나도 새로 잘 발급하는지 확인
     // If access token is already set and not expired, return it
     let token = FCM_ACCESS_TOKEN.lock().unwrap().clone();
-    if token.is_some() {
-        let token = token.unwrap();
+    if let Some(token) = token {
         // Check if the token is still valid
         if token.expires_at > Utc::now() {
             rss_fetch_and_notification_info!("Using cached FCM access token");
