@@ -189,6 +189,7 @@ async fn fetch_webdriver_rss_and_store(
             .next_back()
             .unwrap_or("")
             .to_string();
+        info!("platform: {}", platform);
 
         let item_title = match platform.as_str() {
             "instagram" => {
