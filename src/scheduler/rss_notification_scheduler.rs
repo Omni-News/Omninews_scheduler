@@ -177,7 +177,6 @@ async fn fetch_webdriver_rss_and_store(
     let mut item_titles: Vec<String> = Vec::new();
 
     let rss_channels = channel_service::get_rss_channels_with_webdriver(pool).await?;
-    info!("channels: {:?}", rss_channels);
     for rss_channel in rss_channels {
         let channel_id = rss_channel.channel_id.unwrap_or_default();
         let channel_title = rss_channel.channel_title.unwrap_or_default();
@@ -212,7 +211,6 @@ async fn fetch_webdriver_rss_and_store(
                 )
                 .await?
             }
-            // TODO: css 만들어야됨.
             _ => {
                 rss_fetch_and_notification_warn!("[Scheduler] Unsupported platform: {}", platform);
                 continue;
@@ -233,6 +231,8 @@ pub async fn get_rss_items_by_channel_crawl(rss_link: &str) -> Result<Vec<Item>,
     // TODO:  rss item의 title이  Some("")일 수 있음. 문제 발생 시 추적 및 조치
     Ok(item.to_vec())
 }
+
+// TODO: CSS의 경우 만들어야함.
 
 async fn send_notification_each_user(
     pool: &MySqlPool,
