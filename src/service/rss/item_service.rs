@@ -5,6 +5,7 @@ use crate::{
     service::embedding_service,
     utils::embedding_util::EmbeddingService,
 };
+use chrono::FixedOffset;
 use chrono::{DateTime, NaiveDateTime};
 use scraper::{Html, Selector};
 use sqlx::MySqlPool;
@@ -80,11 +81,8 @@ fn use_channel_url_if_none(link: Option<String>, channel_image_url: String) -> S
 pub fn parse_pub_date(pub_date_str: Option<&str>) -> Option<NaiveDateTime> {
     pub_date_str.and_then(|date_str| {
         if let Ok(dt) = DateTime::parse_from_rfc2822(date_str) {
-            if dt.offset().local_minus_utc() == 9 * 3600 {
-                Some(dt.naive_local())
-            } else {
-                Some(dt.naive_utc())
-            }
+            let kst = FixedOffset::east_opt(9 * 3600).unwrap();
+            Some(dt.with_timezone(&kst).naive_local())
         } else {
             None
         }

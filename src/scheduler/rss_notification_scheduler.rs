@@ -125,13 +125,8 @@ pub async fn fetch_default_rss_and_store(
                     break;
                 }
             }
-
             let rss_pub_date = parse_pub_date(item.pub_date());
-            // TODO: rss pub date 잘 가져오는지 확인
-            info!(
-                "channel title, item title, item pub date: {channel_title}, {:?}, {:?}",
-                item.title, rss_pub_date
-            );
+
             let rss_item = NewRssItem {
                 channel_id: Some(channel_id),
                 rss_link: item.link.clone(),
