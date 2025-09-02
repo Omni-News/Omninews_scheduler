@@ -177,6 +177,7 @@ async fn fetch_webdriver_rss_and_store(
     let mut item_titles: Vec<String> = Vec::new();
 
     let rss_channels = channel_service::get_rss_channels_with_webdriver(pool).await?;
+    info!("channels: {:?}", rss_channels);
     for rss_channel in rss_channels {
         let channel_id = rss_channel.channel_id.unwrap_or_default();
         let channel_title = rss_channel.channel_title.unwrap_or_default();
@@ -211,6 +212,7 @@ async fn fetch_webdriver_rss_and_store(
                 )
                 .await?
             }
+            // TODO: css 만들어야됨.
             _ => {
                 rss_fetch_and_notification_warn!("[Scheduler] Unsupported platform: {}", platform);
                 continue;
