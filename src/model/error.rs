@@ -41,6 +41,9 @@ pub enum OmniNewsError {
 
     #[error("Firebase error")]
     FirebaseError,
+
+    #[error("Parse error")]
+    ParseError,
 }
 
 #[derive(Debug, Error)]
