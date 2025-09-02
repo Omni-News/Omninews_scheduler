@@ -168,7 +168,7 @@ pub async fn fetch_instagram_rss_and_store(
         .await?;
     } else {
         // 로그인
-        info!("[Instagram-fetch] Sign in...");
+        info!("[OInstagram-fetch] Sign in...");
         let _ = driver
             .goto("http://www.instagram.com")
             .await
@@ -189,15 +189,8 @@ pub async fn fetch_instagram_rss_and_store(
         } else {
             warn!("여기오면안됨.");
             // 혹시 로그인 유도 모달(닫기 버튼) 존재시 닫기 (한국어/영어 모두 대응)
-            dismiss_close_overlay(driver).await.ok();
-            item_titles = fetch_rss_and_store_new_feeds(
-                pool,
-                embedding_service,
-                driver,
-                feeds_graphql_url,
-                channel_id,
-            )
-            .await?;
+            error!("여기오면 안됩니다. 다시 시도하세요.");
+            return Err(OmniNewsError::NotFound("메롱".to_string()));
         }
     }
 
