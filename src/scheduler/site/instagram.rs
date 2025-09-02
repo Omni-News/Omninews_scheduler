@@ -131,6 +131,8 @@ pub async fn fetch_instagram_rss_and_store(
     link: &str,
     channel_id: i32,
 ) -> Result<Vec<String>, OmniNewsError> {
+    // update info랑 겹치지 않기 위함.
+    sleep(Duration::from_millis(5000)).await;
     let strategy = AcquireStrategy::Wait(Some(Duration::from_secs(10)));
     let driver_handle = driver_pool.acquire(strategy).await.map_err(|e| {
         error!("[Service-instagram] Failed to acquire WebDriver: {:?}", e);
@@ -170,6 +172,7 @@ pub async fn fetch_instagram_rss_and_store(
             .map_err(map_wd_err);
         info!("[Instagram-fetch]goto instagram.com");
         info!("[Instagram-fetch] check is login page");
+        sleep(Duration::from_millis(1000)).await;
         if is_login_page(driver).await? {
             info!("[Instagram-fetch]  is login page. attempt login");
             attempt_login(driver).await?;
@@ -268,13 +271,17 @@ async fn build_item_not_exist_in_db(
         .and_then(|v| v.get("edges"))
         .and_then(|v| v.as_array())
         .unwrap();
+    sleep(Duration::from_millis(1000)).await;
     for v in items_json {
-        let raw_texts = v
+        let raw_texts = match v
             .get("node")
             .and_then(|v| v.get("caption"))
             .and_then(|v| v.get("text"))
-            .unwrap()
-            .to_string();
+        {
+            Some(res) => res,
+            None => continue,
+        }
+        .to_string();
 
         let texts = raw_texts.split("\\n").collect::<Vec<&str>>();
 
