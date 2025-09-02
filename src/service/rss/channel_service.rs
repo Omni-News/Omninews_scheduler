@@ -56,7 +56,11 @@ pub async fn parse_rss_link_to_channel(link: &str) -> Result<Channel, OmniNewsEr
     })?;
     let body = response.text().await.map_err(OmniNewsError::Request)?;
     Channel::read_from(body.as_bytes()).map_err(|e| {
-        rss_fetch_and_notification_error!("[Service] Failed to read from rss body: {:?}", e);
+        rss_fetch_and_notification_error!(
+            "[Service] Failed to read from rss body: {:?}, link: {link}, \n body: {:?}",
+            e,
+            body
+        );
         OmniNewsError::FetchUrl
     })
 }
@@ -333,8 +337,8 @@ pub async fn parse_rss_link_to_channel_with_web_driver(
     }
     Channel::read_from(body.as_bytes()).map_err(|e| {
         error!(
-            "[Service] Failed to read from rss body: {:?}, link: {link}",
-            e
+            "[Service] Failed to read from rss body-with webdriver: {:?}, link: {link},\n body: {:?}",
+            e, body
         );
         OmniNewsError::ParseRssChannel
     })
