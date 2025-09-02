@@ -33,13 +33,13 @@ pub struct DriverPoolConfig {
 impl Default for DriverPoolConfig {
     fn default() -> Self {
         Self {
-            max_sessions: 5,
+            max_sessions: 2,
             selenium_endpoints: vec![
                 env::var("SCHEDULER_SELENIUM_URL_1").expect("SCHEDULER_SELENIUM_URL_1 not set"),
                 env::var("SCHEDULER_SELENIUM_URL_2").expect("SCHEDULER_SELENIUM_URL_2 not set"),
-                env::var("SCHEDULER_SELENIUM_URL_3").expect("SCHEDULER_SELENIUM_URL_3 not set"),
-                env::var("SCHEDULER_SELENIUM_URL_4").expect("SCHEDULER_SELENIUM_URL_4 not set"),
-                env::var("SCHEDULER_SELENIUM_URL_5").expect("SCHEDULER_SELENIUM_URL_5 not set"),
+                //                env::var("SCHEDULER_SELENIUM_URL_3").expect("SCHEDULER_SELENIUM_URL_3 not set"),
+                //                env::var("SCHEDULER_SELENIUM_URL_4").expect("SCHEDULER_SELENIUM_URL_4 not set"),
+                //                env::var("SCHEDULER_SELENIUM_URL_5").expect("SCHEDULER_SELENIUM_URL_5 not set"),
             ],
             page_load_strategy: PageLoadStrategy::Eager,
             window_size: (1920, 1080),

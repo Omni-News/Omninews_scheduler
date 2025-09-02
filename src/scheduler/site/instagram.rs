@@ -131,19 +131,13 @@ pub async fn fetch_instagram_rss_and_store(
     link: &str,
     channel_id: i32,
 ) -> Result<Vec<String>, OmniNewsError> {
-    info!(
-        "[Instagram-fetch] Start fetching Instagram RSS for link: {}",
-        link
-    );
     let strategy = AcquireStrategy::Wait(Some(Duration::from_secs(10)));
     let driver_handle = driver_pool.acquire(strategy).await.map_err(|e| {
         error!("[Service-instagram] Failed to acquire WebDriver: {:?}", e);
         OmniNewsError::WebDriverPool(e)
     })?;
     let driver = driver_handle.driver();
-    info!("[Instagram-fetch] Acquired WebDriver");
     let username = extract_username(link).ok_or_else(|| OmniNewsError::ExtractLinkError)?;
-    info!("[Instagram-fetch] Extracted username: {}", username);
 
     let feeds_graphql_url = format!(
         r#"
@@ -158,7 +152,6 @@ pub async fn fetch_instagram_rss_and_store(
     let is_sign_in = is_sign_in_by_graphql(driver).await?;
 
     let item_titles: Vec<String>;
-    info!("[instagram-fetch] is_sign_in: {}", is_sign_in);
     if is_sign_in {
         item_titles = fetch_rss_and_store_new_feeds(
             pool,
@@ -180,6 +173,7 @@ pub async fn fetch_instagram_rss_and_store(
         if is_login_page(driver).await? {
             info!("[Instagram-fetch]  is login page. attempt login");
             attempt_login(driver).await?;
+            sleep(Duration::from_millis(3000)).await;
             info!("[Instagram-fetch] login success");
             item_titles = fetch_rss_and_store_new_feeds(
                 pool,
@@ -207,7 +201,6 @@ async fn fetch_rss_and_store_new_feeds(
     feeds_graphql_url: String,
     channel_id: i32,
 ) -> Result<Vec<String>, OmniNewsError> {
-    info!("[Instagram] Fetching feeds from: {}", feeds_graphql_url);
     let _ = driver.goto(feeds_graphql_url).await.map_err(map_wd_err);
 
     let data = driver.find(By::Css("body")).await.map_err(map_wd_err);
@@ -262,7 +255,13 @@ async fn build_item_not_exist_in_db(
     let mut items = Vec::new();
 
     let data_s = el.text().await.map_err(map_wd_err)?;
-    let data_v: Value = serde_json::from_str(data_s.as_str()).unwrap();
+    let data_v: Value = match serde_json::from_str(data_s.as_str()) {
+        Ok(v) => v,
+        Err(e) => {
+            error!("[Instagram-fetch] Failed to parse graphql data to json: {e}");
+            return Err(OmniNewsError::ParseError);
+        }
+    };
     let items_json = data_v
         .get("data")
         .and_then(|v| v.get("xdt_api__v1__feed__user_timeline_graphql_connection"))
@@ -330,12 +329,12 @@ async fn build_item_not_exist_in_db(
             .unwrap_or("")
             .to_string();
 
+        info!("item title, description, link: {title}, {description}, {link}");
         // 이미 link가 db에 존재하는지 확인.
-        if item_service::is_exist_rss_item_by_link(pool, &link)
-            .await
-            .is_ok()
-        {
-            return Ok(items);
+        if let Ok(res) = item_service::is_exist_rss_item_by_link(pool, &link).await {
+            if res {
+                return Ok(items);
+            }
         }
 
         let item = ItemBuilder::default()
@@ -409,6 +408,8 @@ async fn attempt_login(driver: &WebDriver) -> Result<(), OmniNewsError> {
             "//button[text()='정보 저장'] | //button[text()='Save info']",
         ))
         .await;
+
+    sleep(Duration::from_millis(1000)).await;
 
     if save_info_el.is_ok() {
         if let Ok(btn) = save_info_el {

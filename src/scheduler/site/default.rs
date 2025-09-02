@@ -124,11 +124,10 @@ pub async fn fetch_default_rss_and_store(
         for item in channel.items() {
             let link = &item.link.clone().unwrap_or_default();
 
-            if item_service::is_exist_rss_item_by_link(pool, link)
-                .await
-                .is_ok()
-            {
-                return Ok(items);
+            if let Ok(res) = item_service::is_exist_rss_item_by_link(pool, link).await {
+                if res {
+                    return Ok(items);
+                }
             }
 
             let rss_pub_date = item_service::parse_pub_date(item.pub_date());
