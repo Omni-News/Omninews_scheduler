@@ -43,6 +43,10 @@ pub async fn update_default_channel_info(
             Ok(c) => c,
             Err(_) => {
                 // reqwest같은 크롤러 봇 막힘. webdriver로 재시도
+                info!(
+                    "[Service] reqwest parsing failed, retrying with WebDriver for {}",
+                    rss_link
+                );
                 match channel_service::get_rss_channel_by_web_driver(driver, &rss_link).await {
                     Ok(c) => c,
                     Err(e) => {
