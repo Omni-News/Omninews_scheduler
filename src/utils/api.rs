@@ -90,7 +90,7 @@ pub async fn query_llama_summarize(summarize_num: i32, phrase: &str) -> String {
                 match resp.json::<ChatResponse>().await {
                     Ok(parsed) => {
                         let content = &parsed.candidates[0].content.parts[0].text;
-                        info!("content: {}", content);
+                        //info!("content: {}", content);
                         content.to_string()
                     }
                     Err(e) => {

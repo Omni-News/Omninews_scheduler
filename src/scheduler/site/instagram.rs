@@ -47,13 +47,11 @@ pub async fn update_instagram_channel_info(
     let is_sign_in = is_sign_in_by_graphql(driver).await?;
 
     let channel_id;
-    info!("[Instagram-update] is_sign_in: {}", is_sign_in);
     if is_sign_in {
         channel_id =
             update_channel_info(pool, embedding_service, driver, &instagram_channel_link).await?;
     } else {
         // 로그인
-        info!("[Instagram-update] Sign in...");
         let _ = driver
             .goto("http://www.instagram.com")
             .await
@@ -66,14 +64,13 @@ pub async fn update_instagram_channel_info(
                     .await?;
         } else {
             // 혹시 로그인 유도 모달(닫기 버튼) 존재시 닫기 (한국어/영어 모두 대응)
-            warn!("여기오면ㅇ ㅏㄴ됨.");
+            error!("여기오면ㅇ ㅏㄴ됨.");
             dismiss_close_overlay(driver).await.ok();
             channel_id =
                 update_channel_info(pool, embedding_service, driver, &instagram_channel_link)
                     .await?;
         }
     }
-    info!("channel id : {}", channel_id);
     Ok(channel_id)
 }
 
@@ -134,14 +131,19 @@ pub async fn fetch_instagram_rss_and_store(
     link: &str,
     channel_id: i32,
 ) -> Result<Vec<String>, OmniNewsError> {
+    info!(
+        "[Instagram-fetch] Start fetching Instagram RSS for link: {}",
+        link
+    );
     let strategy = AcquireStrategy::Wait(Some(Duration::from_secs(10)));
     let driver_handle = driver_pool.acquire(strategy).await.map_err(|e| {
         error!("[Service-instagram] Failed to acquire WebDriver: {:?}", e);
         OmniNewsError::WebDriverPool(e)
     })?;
     let driver = driver_handle.driver();
-
+    info!("[Instagram-fetch] Acquired WebDriver");
     let username = extract_username(link).ok_or_else(|| OmniNewsError::ExtractLinkError)?;
+    info!("[Instagram-fetch] Extracted username: {}", username);
 
     let feeds_graphql_url = format!(
         r#"
@@ -178,6 +180,7 @@ pub async fn fetch_instagram_rss_and_store(
         if is_login_page(driver).await? {
             info!("[Instagram-fetch]  is login page. attempt login");
             attempt_login(driver).await?;
+            info!("[Instagram-fetch] login success");
             item_titles = fetch_rss_and_store_new_feeds(
                 pool,
                 embedding_service,
@@ -204,6 +207,7 @@ async fn fetch_rss_and_store_new_feeds(
     feeds_graphql_url: String,
     channel_id: i32,
 ) -> Result<Vec<String>, OmniNewsError> {
+    info!("[Instagram] Fetching feeds from: {}", feeds_graphql_url);
     let _ = driver.goto(feeds_graphql_url).await.map_err(map_wd_err);
 
     let data = driver.find(By::Css("body")).await.map_err(map_wd_err);
