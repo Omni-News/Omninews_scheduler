@@ -78,30 +78,17 @@ fn use_channel_url_if_none(link: Option<String>, channel_image_url: String) -> S
 }
 
 pub fn parse_pub_date(pub_date_str: Option<&str>) -> Option<NaiveDateTime> {
-    pub_date_str
-        .and_then(|date_str| {
-            // 1. RFC2822 형식 파싱 시도
-            if let Ok(dt) = DateTime::parse_from_rfc2822(date_str) {
-                // 타임존이 KST/+09:00 인지 확인 (초 단위로 환산해서 비교)
-                if dt.offset().local_minus_utc() == 9 * 3600 {
-                    // 한국 시간이면 타임존 제거만 하고 값 유지
-                    return Some(dt.naive_local());
-                } else {
-                    // 다른 타임존이면 기존처럼 UTC 변환
-                    return Some(dt.naive_utc());
-                }
+    pub_date_str.and_then(|date_str| {
+        if let Ok(dt) = DateTime::parse_from_rfc2822(date_str) {
+            if dt.offset().local_minus_utc() == 9 * 3600 {
+                Some(dt.naive_local())
+            } else {
+                Some(dt.naive_utc())
             }
-
+        } else {
             None
-        })
-        .or_else(|| {
-            // 파싱 실패하면 디폴트 시간
-            Some(
-                NaiveDateTime::parse_from_str("1970-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
-                    .ok()
-                    .unwrap(),
-            )
-        })
+        }
+    })
 }
 
 async fn store_rss_item(pool: &MySqlPool, mut rss_item: NewRssItem) -> Result<i32, OmniNewsError> {
