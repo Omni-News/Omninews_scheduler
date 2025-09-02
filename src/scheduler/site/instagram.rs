@@ -329,11 +329,10 @@ async fn build_item_not_exist_in_db(
             .unwrap_or("")
             .to_string();
 
-        info!("item title, description, link: {title}, {description}, {link}");
         // 이미 link가 db에 존재하는지 확인.
         if let Ok(res) = item_service::is_exist_rss_item_by_link(pool, &link).await {
             if res {
-                return Ok(items);
+                continue;
             }
         }
 

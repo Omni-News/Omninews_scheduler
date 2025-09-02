@@ -126,7 +126,7 @@ pub async fn fetch_default_rss_and_store(
 
             if let Ok(res) = item_service::is_exist_rss_item_by_link(pool, link).await {
                 if res {
-                    return Ok(items);
+                    continue;
                 }
             }
 
