@@ -205,6 +205,7 @@ async fn fetch_rss_and_store_new_feeds(
     channel_id: i32,
 ) -> Result<Vec<String>, OmniNewsError> {
     let _ = driver.goto(feeds_graphql_url).await.map_err(map_wd_err);
+    sleep(Duration::from_millis(1000)).await;
 
     let data = driver.find(By::Css("body")).await.map_err(map_wd_err);
     match data {
@@ -304,21 +305,17 @@ async fn build_item_not_exist_in_db(
             .and_then(|v| v.get("full_name"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
+
         let pub_date_timestamp = match v
             .get("node")
             .and_then(|v| v.get("caption"))
             .and_then(|v| v.get("created_at"))
         {
-            Some(v) => {
-                // feed
-                v.as_i64()
-            }
-            None => {
-                // reel
-                v.get("node")
-                    .and_then(|v| v.get("taken_at"))
-                    .and_then(|v| v.as_i64())
-            }
+            Some(v) => v.as_i64(),
+            None => v
+                .get("node")
+                .and_then(|v| v.get("taken_at"))
+                .and_then(|v| v.as_i64()),
         }
         .map(|v| Utc.timestamp_opt(v, 0))
         .unwrap()

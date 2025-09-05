@@ -7,7 +7,7 @@ use crate::{
     repository::news_repository,
     utils::api::query_llama_summarize,
 };
-use chrono::{Duration, NaiveDateTime};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime};
 use reqwest::Client;
 use scraper::{Html, Selector};
 use sqlx::MySqlPool;
@@ -176,6 +176,8 @@ fn make_news(document: Html, news_selector: Selector, subject: &String) -> Vec<N
 fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
     let current_time = chrono::Local::now();
 
+    let kst = FixedOffset::east_opt(9 * 3600).unwrap();
+
     if pub_date.is_empty() {
         return None;
     }
@@ -186,6 +188,7 @@ fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
         Some(
             NaiveDateTime::parse_from_str(
                 &current_time
+                    .with_timezone(&kst)
                     .checked_sub_signed(Duration::minutes(value.parse::<i64>().unwrap_or_default()))
                     .unwrap_or_default()
                     .format("%Y-%m-%d %H:%M:%S")
@@ -199,6 +202,7 @@ fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
         Some(
             NaiveDateTime::parse_from_str(
                 &current_time
+                    .with_timezone(&kst)
                     .checked_sub_signed(Duration::hours(value.parse::<i64>().unwrap_or_default()))
                     .unwrap_or_default()
                     .format("%Y-%m-%d %H:%M:%S")
