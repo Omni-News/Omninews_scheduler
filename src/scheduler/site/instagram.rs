@@ -1,6 +1,6 @@
-use std::{env, time::Duration};
+use std::{env, str::FromStr, time::Duration};
 
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use rss::ItemBuilder;
 use serde_json::Value;
 use sqlx::MySqlPool;
@@ -347,10 +347,15 @@ async fn build_item_not_exist_in_db(
             .description(description)
             .link(link)
             .author(author.to_string())
-            .pub_date(pub_date_rfc2822)
+            .pub_date(pub_date_rfc2822.clone())
             .build();
 
-        let new_item = NewRssItem::new(channel_id, &item, Some(pub_date_rfc2822), image_link);
+        let new_item = NewRssItem::new(
+            channel_id,
+            &item,
+            Some(NaiveDateTime::from_str(&pub_date_rfc2822).unwrap()),
+            image_link,
+        );
 
         items.push(new_item);
     }
