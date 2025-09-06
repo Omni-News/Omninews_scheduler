@@ -350,12 +350,7 @@ async fn build_item_not_exist_in_db(
             .pub_date(pub_date_rfc2822)
             .build();
 
-        let new_item = NewRssItem::new(
-            channel_id,
-            &item,
-            Some(pub_date_timestamp.naive_utc()),
-            image_link,
-        );
+        let new_item = NewRssItem::new(channel_id, &item, Some(pub_date_rfc2822), image_link);
 
         items.push(new_item);
     }
