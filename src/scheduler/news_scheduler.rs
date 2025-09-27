@@ -7,7 +7,7 @@ use tokio::{
     time::{interval_at, Instant},
 };
 
-use crate::{global::FETCH_FLAG, news_error, news_info};
+use crate::{global::FETCH_FLAG, news_error, news_info, news_warn};
 
 pub async fn fetch_news_scheduler(pool: &MySqlPool) {
     let mut interval = interval_at(Instant::now(), Duration::from_secs(300)); // 5 minutes
@@ -34,7 +34,17 @@ pub async fn fetch_news_scheduler(pool: &MySqlPool) {
             Ok(_) => {
                 news_info!("[Scheduler] Successfully fetched news");
             }
-            Err(e) => news_error!("[Scheduler] Failed to fetch news: {:?}", e),
+            Err(e) => {
+                news_error!("[Scheduler] Failed to fetch news: {:?}", e);
+
+                task::spawn_blocking(move || {
+                    let mut fetch_flag = FETCH_FLAG.lock().unwrap();
+                    *fetch_flag = true;
+                    news_warn!("[Service] Failed to fetch news, fetch_flag set to true");
+                })
+                .await
+                .unwrap();
+            }
         };
     }
 }
