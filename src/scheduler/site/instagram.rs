@@ -1,6 +1,6 @@
 use std::{env, str::FromStr, time::Duration};
 
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use rss::ItemBuilder;
 use serde_json::Value;
 use sqlx::MySqlPool;
@@ -350,12 +350,16 @@ async fn build_item_not_exist_in_db(
             .pub_date(pub_date_rfc2822.clone())
             .build();
 
-        let new_item = NewRssItem::new(
-            channel_id,
-            &item,
-            Some(NaiveDateTime::from_str(&pub_date_rfc2822).unwrap()),
-            image_link,
-        );
+        info!("pub_date_rfc2822: {}", pub_date_rfc2822);
+        let pub_date = match DateTime::parse_from_rfc2822(&pub_date_rfc2822) {
+            Ok(res) => res.naive_local(),
+            Err(e) => {
+                error!("Failed to parse NaiveDateTime from pub_date_rfc2822: {e}");
+                return Err(OmniNewsError::ParseError);
+            }
+        };
+
+        let new_item = NewRssItem::new(channel_id, &item, Some(pub_date), image_link);
 
         items.push(new_item);
     }
