@@ -1,6 +1,6 @@
-use std::{env, str::FromStr, time::Duration};
+use std::{env, time::Duration};
 
-use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use rss::ItemBuilder;
 use serde_json::Value;
 use sqlx::MySqlPool;
