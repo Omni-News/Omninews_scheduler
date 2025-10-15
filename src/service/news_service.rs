@@ -72,7 +72,9 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
         let document = Html::parse_document(&res);
         let news_selector = Selector::parse(".sa_item_flex").unwrap();
 
-        let newsses = make_news(document, news_selector, subject);
+        let mut newsses = make_news(document, news_selector, subject);
+        // 헤드라인 뉴스 10개는 사용 안함.
+        let _ = newsses.drain(0..9);
 
         for mut news in newsses {
             match news_repository::select_news_by_title(pool, news.news_title.clone().unwrap())
@@ -85,7 +87,13 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
                         continue;
                     }
 
-                    match summarize_news(news.news_link.clone().unwrap().as_str()).await {
+                    match summarize_news(
+                        news.news_link.clone().unwrap().as_str(),
+                        news.news_title.clone().unwrap().as_str(),
+                        news.news_description.clone().unwrap().as_str(),
+                    )
+                    .await
+                    {
                         Ok(res) => {
                             news.news_summary = Some(res);
                         }
@@ -217,7 +225,13 @@ fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
     }
 }
 
-async fn summarize_news(news_link: &str) -> Result<String, OmniNewsError> {
+// 뉴스는 약 3000자 미만만 요약시킴.
+// 뉴스가 너무 많이 올라올 때 어떻게 할지 금액 보면서 조치하기.
+async fn summarize_news(
+    news_link: &str,
+    news_title: &str,
+    news_description: &str,
+) -> Result<String, OmniNewsError> {
     let client = Client::new();
 
     let res = client.get(news_link).send().await?.text().await?;
@@ -257,7 +271,15 @@ async fn summarize_news(news_link: &str) -> Result<String, OmniNewsError> {
         news_error!("[Service] spawn_blocking failed: {:?}", e);
         OmniNewsError::FetchNews
     })?;
+
     news_info!("[Service] Fetched content length: {}", content.len());
+    news_info!("[Service] content: \n\n {news_title} \n\n",);
+
+    // 너무 긴 뉴스는 (약 3000자) 요약 X
+    if content.len() > 5000 {
+        return Ok(news_description.into());
+    }
+
     let summary = query_gemini_summarize(50, &content).await;
 
     Ok(summary)
