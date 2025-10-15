@@ -5,9 +5,10 @@ use crate::{
     model::{error::OmniNewsError, news::NewNews},
     news_error, news_info, news_warn,
     repository::news_repository,
-    utils::api::query_llama_summarize,
+    utils::api::query_gemini_summarize,
 };
-use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime};
+use chrono::{Duration, FixedOffset, NaiveDateTime};
+use regex::Regex;
 use reqwest::Client;
 use scraper::{Html, Selector};
 use sqlx::MySqlPool;
@@ -229,7 +230,26 @@ async fn summarize_news(news_link: &str) -> Result<String, OmniNewsError> {
         document
             .select(&news_selector)
             .next()
-            .map(|e| e.inner_html())
+            .map(|element| {
+                // <br> 태그를 줄바꿈으로 변환
+                let html_with_newlines =
+                    element.html().replace("<br>", "\n").replace("<br/>", "\n");
+
+                // 모든 HTML 태그 제거
+                let re = Regex::new(r"<[^>]*>").unwrap();
+                let text = re.replace_all(&html_with_newlines, "");
+
+                // HTML 엔티티 디코딩
+                let decoded = html_escape::decode_html_entities(&text);
+
+                // 연속된 공백과 줄바꿈 정리
+                decoded
+                    .split('\n')
+                    .map(|line| line.trim())
+                    .filter(|line| !line.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
             .unwrap_or_default()
     })
     .await
@@ -237,8 +257,8 @@ async fn summarize_news(news_link: &str) -> Result<String, OmniNewsError> {
         news_error!("[Service] spawn_blocking failed: {:?}", e);
         OmniNewsError::FetchNews
     })?;
-
-    let summary = query_llama_summarize(50, &content).await;
+    news_info!("[Service] Fetched content length: {}", content.len());
+    let summary = query_gemini_summarize(50, &content).await;
 
     Ok(summary)
 }

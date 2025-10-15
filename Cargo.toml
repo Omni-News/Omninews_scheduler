@@ -23,6 +23,7 @@ sqlx = { version = "0.8", features = ["chrono", "mysql", "runtime-tokio"] }
 
 # crawl
 scraper = "0.23.0"
+html-escape = "*"
 
 # DateTime
 chrono = { version = "0.4", features = ["serde"] }

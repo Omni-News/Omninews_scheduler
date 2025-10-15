@@ -62,7 +62,7 @@ struct Parts {
     text: String,
 }
 
-pub async fn query_llama_summarize(summarize_num: i32, phrase: &str) -> String {
+pub async fn query_gemini_summarize(summarize_num: i32, phrase: &str) -> String {
     let prompt = format!(
         "아래 뉴스 기사를 요약에 어울리는 객관적 서술체(‘~한다’, ‘~로 보인다’, ‘~라고 밝혔다’)로 요약해 주세요. \
     요약문은 {}자 이상 {}자 이하로 작성해 주세요.\n\n{}",
@@ -101,7 +101,7 @@ pub async fn query_llama_summarize(summarize_num: i32, phrase: &str) -> String {
             } else {
                 let status = resp.status();
                 let body = resp.text().await.unwrap_or_default();
-                eprintln!("❌ llama-server 응답 오류: {status} - {body}");
+                eprintln!("❌ gemini-api 응답 오류: {status} - {body}");
                 "본문 내용을 요약할 수 없습니다.".to_string()
             }
         }
