@@ -18,12 +18,5 @@ WORKDIR /app
 # Copy dependency files
 COPY Cargo.toml Cargo.lock ./
 
-
-# Pre-build dependencies for faster rebuilds
-RUN mkdir src && \
-    echo 'fn main() {println!("Hello, world!");}' > src/main.rs && \
-    cargo build && \
-    rm -rf src
-
 # Default command for development (hot reload)
 CMD ["cargo-watch", "-i", "logs/**", "-x", "run"]
