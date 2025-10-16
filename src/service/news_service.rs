@@ -227,6 +227,7 @@ fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
 
 // 뉴스는 약 3000자 미만만 요약시킴.
 // 뉴스가 너무 많이 올라올 때 어떻게 할지 금액 보면서 조치하기.
+// 10/15 하루에 33만원나옴 ㅋ;
 async fn summarize_news(
     news_link: &str,
     news_title: &str,
@@ -279,8 +280,9 @@ async fn summarize_news(
     if content.len() > 5000 {
         return Ok(news_description.into());
     }
-
-    let summary = query_gemini_summarize(50, &content).await;
-
-    Ok(summary)
+    // TODO: gemini api 해결되기 전까진 description으로 대체
+    //    let summary = query_gemini_summarize(50, &content).await;
+    //
+    //    Ok(summary)
+    Ok(news_description.into())
 }
