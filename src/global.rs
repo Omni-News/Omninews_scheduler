@@ -12,4 +12,5 @@ pub struct FcmAccessToken {
 lazy_static! {
     pub static ref FETCH_FLAG: Mutex<bool> = Mutex::new(true);
     pub static ref FCM_ACCESS_TOKEN: Mutex<Option<FcmAccessToken>> = Mutex::new(None);
+    pub static ref API_REQUEST_COUNT: Mutex<u32> = Mutex::new(0);
 }
