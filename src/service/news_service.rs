@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    global::FETCH_FLAG,
+    global::{API_REQUEST_COUNT, FETCH_FLAG},
     model::{error::OmniNewsError, news::NewNews},
     news_error, news_info, news_warn,
     repository::news_repository,
@@ -273,8 +273,13 @@ async fn summarize_news(
         OmniNewsError::FetchNews
     })?;
 
+    let mut count = API_REQUEST_COUNT.lock().unwrap();
+    *count += 1;
     news_info!("[Service] Fetched content length: {}", content.len());
-    news_info!("[Service] content: \n\n {news_title} \n\n",);
+    news_info!(
+        "[Service] content: \n\n {news_title} \n\n count: {}",
+        *count
+    );
 
     // 너무 긴 뉴스는 (약 3000자) 요약 X
     if content.len() > 5000 {
