@@ -273,21 +273,12 @@ async fn summarize_news(
         OmniNewsError::FetchNews
     })?;
 
-    let mut count = API_REQUEST_COUNT.lock().unwrap();
-    *count += 1;
-    news_info!("[Service] Fetched content length: {}", content.len());
-    news_info!(
-        "[Service] content: \n\n {news_title} \n\n count: {}",
-        *count
-    );
-
     // 너무 긴 뉴스는 (약 3000자) 요약 X
     if content.len() > 5000 {
         return Ok(news_description.into());
     }
-    // TODO: gemini api 해결되기 전까진 description으로 대체
-    //    let summary = query_gemini_summarize(50, &content).await;
-    //
-    //    Ok(summary)
-    Ok(news_description.into())
+
+    let summary = query_gemini_summarize(50, &content).await;
+
+    Ok(summary)
 }
