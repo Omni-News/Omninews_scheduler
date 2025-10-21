@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+use std::env;
+
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::{global::API_REQUEST_COUNT, news_info};
@@ -76,48 +79,52 @@ pub async fn query_gemini_summarize(summarize_num: i32, phrase: &str) -> String 
         }],
     };
 
-    let mut count = API_REQUEST_COUNT.lock().unwrap();
-    *count += 1;
-    news_info!(
-        "[Service] Gemini API request body: {:?}, current count: {}",
-        request_body,
-        *count
-    );
+    let gemini_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set");
 
-    "서비스 문제로 요약 기능이 잠시 중단됩니다.".into()
-    //    let response = client
-    //        .post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent")
-    //        .header("Content-Type", "application/json")
-    //        AIzaSyAHp5xFmMY2RsRaoyKb9itXrQL55IAYNWY <- 10/16 20:02 새로 발급함.
-    //        .header("X-goog-api-key", "AIzaSyBcTZbioNiLamuALOouItAm8JRsy9oEBvM")
-    //        .json(&request_body)
-    //        .send()
-    //        .await;
+    let client = Client::new();
+    let response = client
+        .post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-001:generateContent")
+        .header("Content-Type", "application/json")
+        .header("x-goog-api-key", gemini_key)
+        .json(&request_body)
+        .send()
+        .await;
 
-    //    match response {
-    //        Ok(resp) => {
-    //            if resp.status().is_success() {
-    //                match resp.json::<ChatResponse>().await {
-    //                    Ok(parsed) => {
-    //                        let content = &parsed.candidates[0].content.parts[0].text;
-    //                        //info!("content: {}", content);
-    //                        content.to_string()
-    //                    }
-    //                    Err(e) => {
-    //                        eprintln!("❌ JSON 파싱 실패: {e}");
-    //                        "본문 내용을 요약할 수 없습니다.".to_string()
-    //                    }
-    //                }
-    //            } else {
-    //                let status = resp.status();
-    //                let body = resp.text().await.unwrap_or_default();
-    //                eprintln!("❌ gemini-api 응답 오류: {status} - {body}");
-    //                "본문 내용을 요약할 수 없습니다.".to_string()
-    //            }
-    //        }
-    //        Err(e) => {
-    //            eprintln!("❌ 요청 실패: {e}");
-    //            "본문 내용을 요약할 수 없습니다.".to_string()
-    //        }
-    //    }
+    match response {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                match resp.json::<ChatResponse>().await {
+                    Ok(parsed) => {
+                        let content = &parsed.candidates[0].content.parts[0].text;
+
+                        // OK인 개수 확인
+                        {
+                            let mut count = API_REQUEST_COUNT.lock().unwrap();
+                            *count += 1;
+                            news_info!(
+                                "[Service] Gemini API request body: {:?}, current count: {}",
+                                request_body,
+                                *count
+                            );
+                        }
+                        //info!("content: {}", content);
+                        content.to_string()
+                    }
+                    Err(e) => {
+                        eprintln!("❌ JSON 파싱 실패: {e}");
+                        "본문 내용을 요약할 수 없습니다.".to_string()
+                    }
+                }
+            } else {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                eprintln!("❌ gemini-api 응답 오류: {status} - {body}");
+                "본문 내용을 요약할 수 없습니다.".to_string()
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ 요청 실패: {e}");
+            "본문 내용을 요약할 수 없습니다.".to_string()
+        }
+    }
 }
