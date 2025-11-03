@@ -101,11 +101,7 @@ pub async fn query_gemini_summarize(summarize_num: i32, phrase: &str) -> String 
                         {
                             let mut count = API_REQUEST_COUNT.lock().unwrap();
                             *count += 1;
-                            news_info!(
-                                "[Service] Gemini API request body: {:?}, current count: {}",
-                                request_body,
-                                *count
-                            );
+                            news_info!("[Service] Gemini API current count: {}", *count);
                         }
                         //info!("content: {}", content);
                         content.to_string()
