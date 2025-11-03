@@ -10,7 +10,7 @@ target/
 *.pdb
 
 # enviroment file
-.env
+*.env
 
 .DS_Store
 
