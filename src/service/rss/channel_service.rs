@@ -1,5 +1,7 @@
+use chrono::{FixedOffset, Utc};
+use feed_rs::parser::parse;
 use reqwest::Url;
-use rss::Channel;
+use rss::{Channel, ChannelBuilder, Image, Item, ItemBuilder};
 use serde_json::Value;
 use sqlx::MySqlPool;
 use thirtyfour::WebDriver;
@@ -55,12 +57,96 @@ pub async fn parse_rss_link_to_channel(link: &str) -> Result<Channel, OmniNewsEr
         OmniNewsError::Request(e)
     })?;
     let body = response.text().await.map_err(OmniNewsError::Request)?;
-    Channel::read_from(body.as_bytes()).map_err(|e| {
-        rss_fetch_and_notification_error!(
-            "[Service] Failed to read from rss body: {:?}, link: {link}",
-            e,
-        );
-        OmniNewsError::FetchUrl
+    let channel = Channel::read_from(body.as_bytes()).unwrap_or({
+        // atom이나 더 범용적인 rss포맷임. 이럴 때 feed-rs사용
+        parse_with_feed_rs(body)?
+    });
+
+    Ok(channel)
+}
+
+/// feed-rs를 사용해 atom등의 rss데이터를 뽑아 Channel로 build후 반환함.
+fn parse_with_feed_rs(body: String) -> Result<Channel, OmniNewsError> {
+    let data = parse(body.as_bytes());
+    Ok(match &data {
+        Ok(data) => {
+            let fe_title = match data.title.clone() {
+                Some(data) => data.content,
+                None => "None".to_string(),
+            };
+
+            let fe_link = match data.links.first() {
+                Some(data) => data.href.clone(),
+                None => "None".to_string(),
+            };
+            let fe_description = match data.description.clone() {
+                Some(data) => data.content,
+                None => "None".to_string(),
+            };
+            let fe_language = data.language.clone().unwrap_or("None".to_string());
+            let fe_generator = match data.generator.clone() {
+                Some(data) => data.content,
+                None => "None".to_string(),
+            };
+            let fe_image_link = match data.logo.clone() {
+                Some(data) => data.uri,
+                None => "None".to_string(),
+            };
+
+            let entries = &data.entries;
+            let items = entries
+                .iter()
+                .map(|entry| {
+                    let en_title = match entry.title.clone() {
+                        Some(data) => data.content,
+                        None => "None".to_string(),
+                    };
+                    let en_description = match entry.content.clone() {
+                        Some(data) => data.body.unwrap_or_default(),
+                        None => "None".to_string(),
+                    };
+                    let en_link = match entry.links.first() {
+                        Some(data) => data.href.clone(),
+                        None => "None".to_string(),
+                    };
+                    let en_author = match entry.authors.first() {
+                        Some(data) => data.name.clone(),
+                        None => "None".to_string(),
+                    };
+                    let en_pub_date = entry
+                        .published
+                        .unwrap_or(Utc::now())
+                        .with_timezone(&FixedOffset::east_opt(9 * 3600).unwrap())
+                        .to_rfc2822();
+
+                    ItemBuilder::default()
+                        .title(en_title)
+                        .description(en_description)
+                        .link(en_link)
+                        .author(en_author)
+                        .pub_date(en_pub_date)
+                        .build()
+                })
+                .collect::<Vec<Item>>();
+
+            let mut image = Image::default();
+            image.set_url(fe_image_link);
+
+            ChannelBuilder::default()
+                .title(fe_title)
+                .link(fe_link)
+                .description(fe_description)
+                .language(fe_language)
+                .image(image)
+                .generator(fe_generator)
+                .items(items)
+                .build()
+        }
+
+        Err(_) => {
+            rss_info_error!("[Fervice] Failed to parse feed-rs data: {:?}", data.err());
+            return Err(OmniNewsError::ParseRssChannel);
+        }
     })
 }
 

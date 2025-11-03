@@ -38,6 +38,8 @@ serde_json = "1.0"
 # rss parsing
 reqwest = { version = "*", features = ["json"] }
 rss = "2.0"
+feed-rs = "2.3.1"
+
 
 # crawl
 thirtyfour = "0.36.1"
