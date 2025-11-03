@@ -40,40 +40,34 @@ pub async fn rss_fetch_and_notification_scheduler(
     loop {
         interval.tick().await;
         rss_fetch_and_notification_info!("[Scheduler] Rss Notification Scheduler started");
-        let mut channel_ids: Vec<i32>;
-        let mut channel_titles: Vec<String>;
-        let mut item_titles: Vec<String>;
-
         // default
-        (channel_ids, channel_titles, item_titles) =
-            match fetch_default_rss_and_store(pool, embedding_service).await {
-                Ok(res) => res,
-                Err(e) => {
-                    rss_fetch_and_notification_error!(
-                        "[Scheduler] Failed to fetch and store rss: {}",
-                        e
-                    );
-                    continue;
-                }
-            };
-
-        // instagram or default using webdriver
-        if let Ok((ci, ct, it)) =
-            fetch_webdriver_rss_and_store(pool, embedding_service, driver_pool).await
-        {
-            channel_ids.extend(ci);
-            channel_titles.extend(ct);
-            item_titles.extend(it);
-        }
-
-        let _: () = send_notification_each_user(pool, channel_ids, channel_titles, item_titles)
-            .await
-            .unwrap_or_else(|e| {
+        match fetch_default_rss_and_store(pool, embedding_service).await {
+            Ok(res) => res,
+            Err(e) => {
                 rss_fetch_and_notification_error!(
-                    "[Scheduler] Failed to send notification to each user: {}",
+                    "[Scheduler] Failed to fetch and store rss: {}",
                     e
                 );
-            });
+                continue;
+            }
+        };
+
+        // instagram or default using webdriver
+        match fetch_webdriver_rss_and_store_and_send_notification(
+            pool,
+            embedding_service,
+            driver_pool,
+        )
+        .await
+        {
+            Ok(_) => (),
+            Err(e) => {
+                rss_fetch_and_notification_error!(
+                    "[Scheduler] Failed to fetch and store rss using webdriver: {}",
+                    e
+                );
+            }
+        };
     }
 }
 
@@ -81,11 +75,8 @@ pub async fn rss_fetch_and_notification_scheduler(
 pub async fn fetch_default_rss_and_store(
     pool: &MySqlPool,
     embedding_service: &EmbeddingService,
-) -> Result<(Vec<i32>, Vec<String>, Vec<String>), OmniNewsError> {
+) -> Result<(), OmniNewsError> {
     // loop for 10 minutes
-    let mut channel_ids: Vec<i32> = Vec::new();
-    let mut channel_titles: Vec<String> = Vec::new();
-    let mut item_titles: Vec<String> = Vec::new();
 
     let rss_channels = channel_service::get_default_rss_channels(pool)
         .await
@@ -140,14 +131,18 @@ pub async fn fetch_default_rss_and_store(
             match create_rss_item_and_embedding(pool, embedding_service, rss_item).await {
                 Ok(_) => {
                     let item_title = item.title.clone().unwrap_or_default();
-
-                    channel_ids.push(channel_id);
-                    channel_titles.push(channel_title.to_string());
-                    item_titles.push(item_title.clone());
-
                     rss_fetch_and_notification_info!(
-                        "[Scheduler] Rss Item Created. channel id: {channel_id}, rss item: {item_title}"
+                    "[Scheduler] Rss Item Created. channel id: {channel_id}, rss item: {item_title}"
                     );
+
+                    send_notification_each_user(pool, channel_id, channel_title, &item_title)
+                        .await
+                        .unwrap_or_else(|e| {
+                            rss_fetch_and_notification_error!(
+                                "[Scheduler] Failed to send notification to each user: {}",
+                                e
+                            );
+                        });
                 }
                 Err(e) => {
                     rss_fetch_and_notification_info!(
@@ -163,19 +158,15 @@ pub async fn fetch_default_rss_and_store(
             }
         }
     }
-    Ok((channel_ids, channel_titles, item_titles))
+    Ok(())
 }
 
-async fn fetch_webdriver_rss_and_store(
+async fn fetch_webdriver_rss_and_store_and_send_notification(
     pool: &MySqlPool,
     embedding_service: &EmbeddingService,
     driver_pool: &DriverPool,
-) -> Result<(Vec<i32>, Vec<String>, Vec<String>), OmniNewsError> {
+) -> Result<(), OmniNewsError> {
     // loop for 10 minutes
-    let mut channel_ids: Vec<i32> = Vec::new();
-    let mut channel_titles: Vec<String> = Vec::new();
-    let mut item_titles: Vec<String> = Vec::new();
-
     let rss_channels = channel_service::get_rss_channels_with_webdriver(pool).await?;
     for rss_channel in rss_channels {
         let channel_id = rss_channel.channel_id.unwrap_or_default();
@@ -190,7 +181,7 @@ async fn fetch_webdriver_rss_and_store(
             .unwrap_or("")
             .to_string();
 
-        let item_title = match platform.as_str() {
+        let item_titles = match platform.as_str() {
             "instagram" => {
                 instagram::fetch_instagram_rss_and_store(
                     pool,
@@ -216,13 +207,19 @@ async fn fetch_webdriver_rss_and_store(
                 continue;
             }
         };
-        for i in 0..item_title.len() {
-            channel_ids.push(channel_id);
-            channel_titles.push(channel_title.clone());
-            item_titles.push(item_title.get(i).cloned().unwrap_or_default());
+        for item_title in &item_titles {
+            send_notification_each_user(pool, channel_id, &channel_title, item_title)
+                .await
+                .unwrap_or_else(|e| {
+                    rss_fetch_and_notification_error!(
+                        "[Scheduler] Failed to send notification to each user: {}",
+                        e
+                    );
+                });
         }
     }
-    Ok((channel_ids, channel_titles, item_titles))
+
+    Ok(())
 }
 
 pub async fn get_rss_items_by_channel_crawl(rss_link: &str) -> Result<Vec<Item>, OmniNewsError> {
@@ -236,25 +233,22 @@ pub async fn get_rss_items_by_channel_crawl(rss_link: &str) -> Result<Vec<Item>,
 
 async fn send_notification_each_user(
     pool: &MySqlPool,
-    channel_ids: Vec<i32>,
-    channel_titles: Vec<String>,
-    item_titles: Vec<String>,
+    channel_id: i32,
+    channel_title: &str,
+    item_title: &str,
 ) -> Result<(), OmniNewsError> {
-    for ((channel_id, channel_title), item_title) in
-        (channel_ids.iter().zip(channel_titles)).zip(item_titles)
-    {
-        // Rss채널 구독한 사람들 토큰 가져와서 뿌리기
-        let users_tokens =
-            user_service::get_users_fcm_token_subscribed_channel_by_channel_id(pool, *channel_id)
-                .await
-                .unwrap();
-
-        send_notification_each_token(users_tokens, &channel_title, &item_title)
+    // Rss채널 구독한 사람들 토큰 가져와서 뿌리기
+    let users_tokens =
+        user_service::get_users_fcm_token_subscribed_channel_by_channel_id(pool, channel_id)
             .await
-            .unwrap_or_else(|e| {
-                rss_fetch_and_notification_error!("[Scheduler] Failed to send notification: {}", e);
-            });
-    }
+            .unwrap();
+
+    send_notification_each_token(users_tokens, channel_title, item_title)
+        .await
+        .unwrap_or_else(|e| {
+            rss_fetch_and_notification_error!("[Scheduler] Failed to send notification: {}", e);
+        });
+
     rss_fetch_and_notification_info!("[Scheduler] Rss Notification Scheduler Ended");
     Ok(())
 }
@@ -263,6 +257,7 @@ pub async fn send_notification_each_token(
     channel_title: &str,
     item_title: &str,
 ) -> Result<(), OmniNewsError> {
+    // TODO: 사람 많아지면 이거 한번에 보내는걸 생각해보기
     for token in tokens {
         send_fcm_message(
             token,
