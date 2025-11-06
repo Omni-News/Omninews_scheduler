@@ -420,11 +420,10 @@ pub async fn parse_rss_link_to_channel_with_web_driver(
         );
         return Err(OmniNewsError::WebDriverNotFound);
     }
-    Channel::read_from(body.as_bytes()).map_err(|e| {
-        error!(
-            "[Service] Failed to read from rss body-with webdriver: {:?}, link: {link},\n body: {:?}",
-            e, body
-        );
-        OmniNewsError::ParseRssChannel
-    })
+    let channel = Channel::read_from(body.as_bytes()).unwrap_or({
+        // atom이나 더 범용적인 rss포맷임. 이럴 때 feed-rs사용
+        parse_with_feed_rs(body)?
+    });
+
+    Ok(channel)
 }
