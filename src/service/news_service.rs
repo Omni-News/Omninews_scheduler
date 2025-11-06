@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use crate::{
-    global::{API_REQUEST_COUNT, FETCH_FLAG},
+    global::FETCH_FLAG,
     model::{error::OmniNewsError, news::NewNews},
     news_error, news_info, news_warn,
     repository::news_repository,
     utils::api::query_gemini_summarize,
 };
-use chrono::{Duration, FixedOffset, NaiveDateTime};
+use chrono::{Duration, FixedOffset, NaiveDateTime, Utc};
 use regex::Regex;
 use reqwest::Client;
 use scraper::{Html, Selector};
@@ -54,6 +54,7 @@ fn set_news_type() -> NewsType {
     news_type.insert("생활/문화".to_string(), 103);
     news_type.insert("세계".to_string(), 104);
     news_type.insert("IT/과학".to_string(), 105);
+    news_type.insert("주요".to_string(), 999);
 
     news_type
 }
@@ -62,17 +63,18 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
     let client = Client::new();
 
     for (subject, code) in &news_type {
-        let res = client
-            .get(format!("https://news.naver.com/section/{}", code))
-            .send()
-            .await?
-            .text()
-            .await?;
+        // 주요뉴스 빼오기. -> 구글뉴스 사용.
+        let site = if *code == 999 {
+            "https://news.google.com/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFZxYUdjU0FtdHZHZ0pMVWlnQVAB?hl=ko&gl=KR&ceid=KR%3Ako".to_string()
+        } else {
+            format!("https://news.naver.com/section/{}", code)
+        };
+
+        let res = client.get(site).send().await?.text().await?;
 
         let document = Html::parse_document(&res);
-        let news_selector = Selector::parse(".sa_item_flex").unwrap();
 
-        let mut newsses = make_news(document, news_selector, subject);
+        let mut newsses = make_news(document, subject, *code);
         // 헤드라인 뉴스 10개는 사용 안함.
         let _ = newsses.drain(0..9);
 
@@ -89,7 +91,6 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
 
                     match summarize_news(
                         news.news_link.clone().unwrap().as_str(),
-                        news.news_title.clone().unwrap().as_str(),
                         news.news_description.clone().unwrap().as_str(),
                     )
                     .await
@@ -127,7 +128,12 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
     Ok(())
 }
 
-fn make_news(document: Html, news_selector: Selector, subject: &String) -> Vec<NewNews> {
+fn make_news(document: Html, subject: &String, code: i32) -> Vec<NewNews> {
+    if code == 999 {
+        return make_google_news(document, subject);
+    }
+
+    let news_selector = Selector::parse(".sa_item_flex").unwrap();
     let title_selector = Selector::parse(".sa_text_strong").unwrap();
     let description_selector = Selector::parse(".sa_text_lede").unwrap();
     let link_selector = Selector::parse(".sa_thumb_link").unwrap();
@@ -182,7 +188,66 @@ fn make_news(document: Html, news_selector: Selector, subject: &String) -> Vec<N
         .collect::<Vec<NewNews>>()
 }
 
+fn make_google_news(document: Html, subject: &String) -> Vec<NewNews> {
+    let news_selector = Selector::parse(".LU3Rqb").unwrap();
+    let title_selector = Selector::parse(".gPFEn").unwrap();
+    let description_selector = Selector::parse(".gPFEn").unwrap();
+    let link_selector = Selector::parse(".WwrzSb").unwrap();
+    let source_selector = Selector::parse(".vr1PYe").unwrap();
+    let pub_date_selector = Selector::parse(".IBr9hb > .UOVeFe > .hvbAAd").unwrap();
+    let image_link_selector = Selector::parse(".Quavad.vwBmvb").unwrap();
+
+    document
+        .select(&news_selector)
+        .map(|news| NewNews {
+            news_title: Some(
+                news.select(&title_selector)
+                    .next()
+                    .map(|e| e.inner_html())
+                    .unwrap_or_default(),
+            ),
+            news_description: Some(
+                news.select(&description_selector)
+                    .next()
+                    .map(|e| e.inner_html())
+                    .unwrap_or_default(),
+            ),
+            news_summary: None,
+            news_link: Some(
+                news.select(&link_selector)
+                    .next()
+                    .map(|e| e.attr("href").unwrap())
+                    .map(|value| format!("https://news.google.com/{}", value))
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
+            news_source: Some(
+                news.select(&source_selector)
+                    .next()
+                    .map(|e| e.inner_html())
+                    .unwrap_or_default(),
+            ),
+            news_pub_date: pub_date_to_naive_time(
+                news.select(&pub_date_selector)
+                    .next()
+                    .map(|e| e.inner_html())
+                    .unwrap_or_default(),
+            ),
+            news_image_link: Some(
+                news.select(&image_link_selector)
+                    .next()
+                    .map(|e| e.attr("src").unwrap_or_default())
+                    .map(|value| format!("https://news.google.com{}", value))
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
+            news_category: Some(subject.to_string()),
+        })
+        .collect::<Vec<NewNews>>()
+}
+
 fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
+    let pub_date = pub_date.replace(" ", "");
     let current_time = chrono::Local::now();
 
     let kst = FixedOffset::east_opt(9 * 3600).unwrap();
@@ -220,6 +285,11 @@ fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
             )
             .unwrap_or_default(),
         )
+    } else if pub_date == "어제" {
+        Utc::now()
+            .with_timezone(&FixedOffset::east_opt(9 * 3600).unwrap())
+            .checked_sub_signed(Duration::days(1))
+            .map(|dt| dt.naive_local())
     } else {
         None
     }
@@ -228,11 +298,11 @@ fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
 // 뉴스는 약 3000자 미만만 요약시킴.
 // 뉴스가 너무 많이 올라올 때 어떻게 할지 금액 보면서 조치하기.
 // 10/15 하루에 33만원나옴 ㅋ;
-async fn summarize_news(
-    news_link: &str,
-    news_title: &str,
-    news_description: &str,
-) -> Result<String, OmniNewsError> {
+async fn summarize_news(news_link: &str, news_description: &str) -> Result<String, OmniNewsError> {
+    if news_link.contains("google.com") {
+        // 구글 뉴스는 요약하지 않음.
+        return Ok(news_description.into());
+    }
     let client = Client::new();
 
     let res = client.get(news_link).send().await?.text().await?;
