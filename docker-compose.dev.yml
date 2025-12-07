@@ -24,6 +24,7 @@ services:
       - omninews-prod-network
     stdin_open: true # docker run -i
     tty: true # docker run -t
+    restart: unless-stopped
 
 networks:
   omninews-prod-network:
