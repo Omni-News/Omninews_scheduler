@@ -15,6 +15,10 @@ pub async fn create_rss_item_and_embedding(
     embedding_service: &EmbeddingService,
     rss_item: NewRssItem,
 ) -> Result<bool, OmniNewsError> {
+    if rss_item.rss_title.is_none() {
+        return Err(OmniNewsError::NotFound("rss item".to_string()));
+    }
+
     let mut rss_item = rss_item;
     let description = rss_item
         .rss_description
