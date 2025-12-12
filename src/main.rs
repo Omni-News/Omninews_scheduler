@@ -25,11 +25,8 @@ async fn main() {
     logging::load_logger();
 
     let pool = db_util::create_pool().await;
-
     let embedding_service = EmbeddingService::new();
-
     let dp_cfg = DriverPoolConfig::default();
-
     let driver_pool = DriverPool::new(dp_cfg);
 
     start_scheduler(&pool, &embedding_service, &driver_pool).await;
