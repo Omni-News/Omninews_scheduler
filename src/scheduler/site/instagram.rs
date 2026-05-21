@@ -11,7 +11,7 @@ use crate::{
     config::webdriver::{AcquireStrategy, DriverPool},
     model::{
         error::OmniNewsError,
-        rss::{NewRssChannel, NewRssItem, RssChannel},
+        rss::{CreatedRssItem, NewRssChannel, NewRssItem, RssChannel},
     },
     service::rss::{channel_service, item_service},
     utils::embedding_util::EmbeddingService,
@@ -130,7 +130,7 @@ pub async fn fetch_instagram_rss_and_store(
     driver_pool: &DriverPool,
     link: &str,
     channel_id: i32,
-) -> Result<Vec<String>, OmniNewsError> {
+) -> Result<Vec<CreatedRssItem>, OmniNewsError> {
     // update info랑 겹치지 않기 위함.
     sleep(Duration::from_millis(5000)).await;
     let strategy = AcquireStrategy::Wait(Some(Duration::from_secs(10)));
@@ -153,9 +153,9 @@ pub async fn fetch_instagram_rss_and_store(
         .map_err(map_wd_err);
     let is_sign_in = is_sign_in_by_graphql(driver).await?;
 
-    let item_titles: Vec<String>;
+    let created_items: Vec<CreatedRssItem>;
     if is_sign_in {
-        item_titles = fetch_rss_and_store_new_feeds(
+        created_items = fetch_rss_and_store_new_feeds(
             pool,
             embedding_service,
             driver,
@@ -178,7 +178,7 @@ pub async fn fetch_instagram_rss_and_store(
             attempt_login(driver).await?;
             sleep(Duration::from_millis(3000)).await;
             info!("[Instagram-fetch] login success");
-            item_titles = fetch_rss_and_store_new_feeds(
+            created_items = fetch_rss_and_store_new_feeds(
                 pool,
                 embedding_service,
                 driver,
@@ -194,7 +194,7 @@ pub async fn fetch_instagram_rss_and_store(
         }
     }
 
-    Ok(item_titles)
+    Ok(created_items)
 }
 
 async fn fetch_rss_and_store_new_feeds(
@@ -203,7 +203,7 @@ async fn fetch_rss_and_store_new_feeds(
     driver: &WebDriver,
     feeds_graphql_url: String,
     channel_id: i32,
-) -> Result<Vec<String>, OmniNewsError> {
+) -> Result<Vec<CreatedRssItem>, OmniNewsError> {
     let _ = driver.goto(feeds_graphql_url).await.map_err(map_wd_err);
     sleep(Duration::from_millis(1000)).await;
 
@@ -221,26 +221,24 @@ async fn fetch_rss_and_store_new_feeds(
                     .join(", ")
             );
 
-            for item in &new_items {
-                let _ = item_service::create_rss_item_and_embedding(
-                    pool,
-                    embedding_service,
-                    item.clone(),
-                )
-                .await
-                .map_err(|e| {
-                    error!(
-                        "[Service-instagram] Failed to create rss item and embedding: {:?}",
-                        e
-                    );
-                    e
-                });
+            let mut created_items = Vec::new();
+            for item in new_items {
+                let created_item =
+                    item_service::create_rss_item_and_embedding(pool, embedding_service, item)
+                        .await
+                        .map_err(|e| {
+                            error!(
+                                "[Service-instagram] Failed to create rss item and embedding: {:?}",
+                                e
+                            );
+                            e
+                        });
+                if let Ok(created_item) = created_item {
+                    created_items.push(created_item);
+                }
             }
 
-            Ok(new_items
-                .iter()
-                .map(|i| i.rss_title.clone().unwrap_or_default())
-                .collect::<Vec<String>>())
+            Ok(created_items)
         }
         Err(_) => {
             error!("[Instagram] Failed to get body in graphql data.");

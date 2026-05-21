@@ -7,7 +7,7 @@ use sqlx::MySqlPool;
 use thirtyfour::{error::WebDriverResult, WebDriver};
 
 use crate::config::webdriver::{AcquireStrategy, DriverPool};
-use crate::model::rss::NewRssItem;
+use crate::model::rss::{CreatedRssItem, NewRssItem};
 use crate::service::rss::{channel_service, item_service};
 use crate::{model::error::OmniNewsError, utils::embedding_util::EmbeddingService};
 
@@ -96,7 +96,7 @@ pub async fn fetch_default_rss_and_store(
     driver_pool: &DriverPool,
     channel_link: &str,
     channel_id: i32,
-) -> Result<Vec<String>, OmniNewsError> {
+) -> Result<Vec<CreatedRssItem>, OmniNewsError> {
     let mut items = Vec::new();
     let strategy = AcquireStrategy::Wait(Some(Duration::from_secs(10)));
     let driver_handler = driver_pool.acquire(strategy).await.map_err(|e| {
@@ -135,9 +135,9 @@ pub async fn fetch_default_rss_and_store(
             match item_service::create_rss_item_and_embedding(pool, embedding_service, new_item)
                 .await
             {
-                Ok(_) => {
-                    let item_title = item.title.clone().unwrap_or_default();
-                    items.push(item_title.clone());
+                Ok(created_item) => {
+                    let item_title = created_item.rss_title.clone();
+                    items.push(created_item);
                     info!(
                         "[Service] Rss Item Created. channel id: {channel_id}, rss item: {item_title}"
                     );

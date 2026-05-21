@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{collections::BTreeMap, error::Error};
 
 use reqwest::Client;
 use serde_json::json;
@@ -12,6 +12,7 @@ pub async fn send_fcm_message(
     token: FcmTokenUser,
     title: String,
     body: String,
+    data: &BTreeMap<String, String>,
 ) -> Result<(), Box<dyn Error>> {
     let access_token = get_fcm_access_token_with_expiry().await?;
 
@@ -22,6 +23,7 @@ pub async fn send_fcm_message(
                 "title": title,
                 "body": body,
             },
+            "data": data,
         }
     });
 

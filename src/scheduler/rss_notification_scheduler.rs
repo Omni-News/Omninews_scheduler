@@ -17,7 +17,11 @@ use tokio::time::{interval_at, Instant};
 
 use crate::{
     config::webdriver::DriverPool,
-    model::{error::OmniNewsError, fcm_token::FcmTokenUser, rss::NewRssItem},
+    model::{
+        error::OmniNewsError,
+        fcm_token::FcmTokenUser,
+        rss::{CreatedRssItem, NewRssItem},
+    },
     rss_fetch_and_notification_error, rss_fetch_and_notification_info,
     rss_fetch_and_notification_warn,
     scheduler::site::{default, instagram},
@@ -129,13 +133,13 @@ pub async fn fetch_default_rss_and_store(
                 rss_image_link: Some(channel_image_url.to_string()),
             };
             match create_rss_item_and_embedding(pool, embedding_service, rss_item).await {
-                Ok(_) => {
-                    let item_title = item.title.clone().unwrap_or_default();
+                Ok(created_item) => {
+                    let item_title = created_item.rss_title.clone();
                     rss_fetch_and_notification_info!(
                     "[Scheduler] Rss Item Created. channel id: {channel_id}, rss item: {item_title}"
                     );
 
-                    send_notification_each_user(pool, channel_id, channel_title, &item_title)
+                    send_notification_each_user(pool, channel_id, channel_title, &created_item)
                         .await
                         .unwrap_or_else(|e| {
                             rss_fetch_and_notification_error!(
@@ -181,7 +185,7 @@ async fn fetch_webdriver_rss_and_store_and_send_notification(
             .unwrap_or("")
             .to_string();
 
-        let item_titles = match platform.as_str() {
+        let created_items = match platform.as_str() {
             "instagram" => {
                 instagram::fetch_instagram_rss_and_store(
                     pool,
@@ -207,8 +211,8 @@ async fn fetch_webdriver_rss_and_store_and_send_notification(
                 continue;
             }
         };
-        for item_title in &item_titles {
-            send_notification_each_user(pool, channel_id, &channel_title, item_title)
+        for created_item in &created_items {
+            send_notification_each_user(pool, channel_id, &channel_title, created_item)
                 .await
                 .unwrap_or_else(|e| {
                     rss_fetch_and_notification_error!(
@@ -235,7 +239,7 @@ async fn send_notification_each_user(
     pool: &MySqlPool,
     channel_id: i32,
     channel_title: &str,
-    item_title: &str,
+    item: &CreatedRssItem,
 ) -> Result<(), OmniNewsError> {
     // Rss채널 구독한 사람들 토큰 가져와서 뿌리기
     let users_tokens =
@@ -243,26 +247,25 @@ async fn send_notification_each_user(
             .await
             .unwrap();
 
-    send_notification_each_token(users_tokens, channel_title, item_title)
-        .await
-        .unwrap_or_else(|e| {
-            rss_fetch_and_notification_error!("[Scheduler] Failed to send notification: {}", e);
-        });
+    send_notification_each_token(users_tokens, channel_title, item).await?;
 
     rss_fetch_and_notification_info!("[Scheduler] Rss Notification Scheduler Ended");
     Ok(())
 }
+
 pub async fn send_notification_each_token(
     tokens: Vec<FcmTokenUser>,
     channel_title: &str,
-    item_title: &str,
+    item: &CreatedRssItem,
 ) -> Result<(), OmniNewsError> {
+    let data = item.to_fcm_data();
     // TODO: 사람 많아지면 이거 한번에 보내는걸 생각해보기
     for token in tokens {
         send_fcm_message(
             token,
             format!("{channel_title}의 새로운 RSS"),
-            format!("{item_title}."),
+            item.rss_title.clone(),
+            &data,
         )
         .await
         .map_err(|_| OmniNewsError::FirebaseError)?;
