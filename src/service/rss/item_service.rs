@@ -1,5 +1,9 @@
 use crate::{
-    model::{embedding::NewEmbedding, error::OmniNewsError, rss::NewRssItem},
+    model::{
+        embedding::NewEmbedding,
+        error::OmniNewsError,
+        rss::{CreatedRssItem, NewRssItem},
+    },
     repository::rss_item_repository,
     rss_fetch_and_notification_error, rss_fetch_and_notification_warn,
     service::embedding_service,
@@ -13,13 +17,12 @@ use sqlx::MySqlPool;
 pub async fn create_rss_item_and_embedding(
     pool: &MySqlPool,
     embedding_service: &EmbeddingService,
-    rss_item: NewRssItem,
-) -> Result<bool, OmniNewsError> {
+    mut rss_item: NewRssItem,
+) -> Result<CreatedRssItem, OmniNewsError> {
     if rss_item.rss_title.is_none() {
         return Err(OmniNewsError::NotFound("rss item".to_string()));
     }
 
-    let mut rss_item = rss_item;
     let description = rss_item
         .rss_description
         .clone()
@@ -34,13 +37,14 @@ pub async fn create_rss_item_and_embedding(
     );
     rss_item.rss_image_link = Some(item_image_link);
 
-    let item_id = store_rss_item(pool, rss_item.clone()).await.unwrap();
+    truncate_rss_description(&mut rss_item);
+    let item_id = store_rss_item(pool, rss_item.clone()).await?;
 
     let sentence = format!(
         "{}\n{}\n{}",
-        rss_item.rss_title.clone().unwrap_or_default(),
+        rss_item.rss_title.as_deref().unwrap_or_default(),
         extracted_description,
-        rss_item.rss_author.clone().unwrap_or_default()
+        rss_item.rss_author.as_deref().unwrap_or_default()
     );
     let embedding = NewEmbedding {
         embedding_value: None,
@@ -51,7 +55,13 @@ pub async fn create_rss_item_and_embedding(
     };
 
     embedding_service::create_embedding(pool, embedding_service, sentence, embedding).await?;
-    Ok(true)
+    Ok(CreatedRssItem::from_new(item_id, rss_item))
+}
+
+fn truncate_rss_description(rss_item: &mut NewRssItem) {
+    if let Some(description) = rss_item.rss_description.as_mut() {
+        *description = description.chars().take(200).collect();
+    }
 }
 
 fn extract_html_to_passage_and_image_link(html: &str) -> (String, Option<String>) {
@@ -93,12 +103,8 @@ pub fn parse_pub_date(pub_date_str: Option<&str>) -> Option<NaiveDateTime> {
     })
 }
 
-async fn store_rss_item(pool: &MySqlPool, mut rss_item: NewRssItem) -> Result<i32, OmniNewsError> {
+async fn store_rss_item(pool: &MySqlPool, rss_item: NewRssItem) -> Result<i32, OmniNewsError> {
     let item_link = rss_item.rss_link.clone().unwrap_or_default();
-
-    if let Some(str) = rss_item.rss_description.as_mut() {
-        *str = str.chars().take(200).collect()
-    };
 
     match rss_item_repository::is_exist_rss_item_by_link(pool, &item_link).await {
         Ok(_) => {

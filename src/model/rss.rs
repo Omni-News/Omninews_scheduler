@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::NaiveDateTime;
 use rss::Item;
 
@@ -44,6 +46,19 @@ pub struct NewRssItem {
     pub rss_pub_date: Option<NaiveDateTime>,
     pub rss_rank: Option<i32>,
     pub rss_image_link: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreatedRssItem {
+    pub rss_id: i32,
+    pub channel_id: i32,
+    pub rss_title: String,
+    pub rss_description: String,
+    pub rss_link: String,
+    pub rss_author: String,
+    pub rss_pub_date: Option<NaiveDateTime>,
+    pub rss_rank: i32,
+    pub rss_image_link: String,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -93,5 +108,78 @@ impl NewRssItem {
             rss_rank: Some(0),
             rss_image_link: Some(item_image_link),
         }
+    }
+}
+
+impl CreatedRssItem {
+    pub fn from_new(rss_id: i32, item: NewRssItem) -> Self {
+        Self {
+            rss_id,
+            channel_id: item.channel_id.unwrap_or_default(),
+            rss_title: item.rss_title.unwrap_or_default(),
+            rss_description: item.rss_description.unwrap_or_default(),
+            rss_link: item.rss_link.unwrap_or_default(),
+            rss_author: item.rss_author.unwrap_or_default(),
+            rss_pub_date: item.rss_pub_date,
+            rss_rank: item.rss_rank.unwrap_or_default(),
+            rss_image_link: item.rss_image_link.unwrap_or_default(),
+        }
+    }
+
+    pub fn to_fcm_data(&self) -> BTreeMap<String, String> {
+        let mut data = BTreeMap::new();
+        data.insert("type".to_string(), "rss_item".to_string());
+        data.insert("rss_id".to_string(), self.rss_id.to_string());
+        data.insert("channel_id".to_string(), self.channel_id.to_string());
+        data.insert("rss_title".to_string(), self.rss_title.clone());
+        data.insert("rss_description".to_string(), self.rss_description.clone());
+        data.insert("rss_link".to_string(), self.rss_link.clone());
+        data.insert("rss_author".to_string(), self.rss_author.clone());
+        data.insert(
+            "rss_pub_date".to_string(),
+            self.rss_pub_date
+                .map(|date| date.format("%Y-%m-%dT%H:%M:%S").to_string())
+                .unwrap_or_default(),
+        );
+        data.insert("rss_rank".to_string(), self.rss_rank.to_string());
+        data.insert("rss_image_link".to_string(), self.rss_image_link.clone());
+        data
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn created_rss_item_fcm_data_contains_routing_fields() {
+        let created = CreatedRssItem {
+            rss_id: 42,
+            channel_id: 7,
+            rss_title: "새 글".to_string(),
+            rss_description: "본문 요약".to_string(),
+            rss_link: "https://example.com/post".to_string(),
+            rss_author: "작성자".to_string(),
+            rss_pub_date: Some(
+                NaiveDateTime::parse_from_str("2026-05-21T12:34:56", "%Y-%m-%dT%H:%M:%S").unwrap(),
+            ),
+            rss_rank: 0,
+            rss_image_link: "https://example.com/image.png".to_string(),
+        };
+
+        let data = created.to_fcm_data();
+
+        assert_eq!(data.get("type"), Some(&"rss_item".to_string()));
+        assert_eq!(data.get("rss_id"), Some(&"42".to_string()));
+        assert_eq!(data.get("channel_id"), Some(&"7".to_string()));
+        assert_eq!(data.get("rss_title"), Some(&"새 글".to_string()));
+        assert_eq!(
+            data.get("rss_link"),
+            Some(&"https://example.com/post".to_string())
+        );
+        assert_eq!(
+            data.get("rss_pub_date"),
+            Some(&"2026-05-21T12:34:56".to_string())
+        );
     }
 }
