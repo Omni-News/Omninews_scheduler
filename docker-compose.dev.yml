@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.dev # 개발용 Dockerfile 사용
     container_name: omninews_scheduler
     ports:
-      - "1029:1029"
+      - "127.0.0.1:1029:1029"
     environment:
       - ROCKET_ENV=development
       - ROCKET_ADDRESS=0.0.0.0
