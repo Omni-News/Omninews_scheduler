@@ -15,6 +15,7 @@ use sqlx::MySqlPool;
 use tokio::task;
 
 type NewsType = HashMap<String, i32>;
+const HEADLINE_SKIP_COUNT: usize = 9;
 
 pub async fn delete_old_news(pool: &MySqlPool) -> Result<i32, OmniNewsError> {
     match news_repository::delete_old_news(pool).await {
@@ -74,14 +75,36 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
 
         let document = Html::parse_document(&res);
 
-        let mut newsses = make_news(document, subject, *code);
-        // 헤드라인 뉴스 10개는 사용 안함.
-        let _ = newsses.drain(0..9);
+        let newsses = make_news(document, subject, *code);
+        if newsses.len() <= HEADLINE_SKIP_COUNT {
+            news_warn!(
+                "[Service] Not enough news items for {}({}): {} items",
+                subject,
+                code,
+                newsses.len()
+            );
+            continue;
+        }
 
-        for mut news in newsses {
-            match news_repository::select_news_by_title(pool, news.news_title.clone().unwrap())
-                .await
-            {
+        // 헤드라인 뉴스 10개는 사용 안함.
+        for mut news in newsses.into_iter().skip(HEADLINE_SKIP_COUNT) {
+            let news_title = match news.news_title.clone().filter(|title| !title.is_empty()) {
+                Some(title) => title,
+                None => {
+                    news_warn!("[Service] Skip news without title: {:?}", news);
+                    continue;
+                }
+            };
+
+            let news_link = match news.news_link.clone().filter(|link| !link.is_empty()) {
+                Some(link) => link,
+                None => {
+                    news_warn!("[Service] Skip news without link: {:?}", news);
+                    continue;
+                }
+            };
+
+            match news_repository::select_news_by_title(pool, news_title).await {
                 Ok(_) => (),
                 Err(_) => {
                     // 발행일 있는 뉴스만 다룸
@@ -90,7 +113,7 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
                     }
 
                     match summarize_news(
-                        news.news_link.clone().unwrap().as_str(),
+                        news_link.as_str(),
                         news.news_description.clone().unwrap().as_str(),
                     )
                     .await
@@ -160,7 +183,7 @@ fn make_news(document: Html, subject: &String, code: i32) -> Vec<NewNews> {
             news_link: Some(
                 news.select(&link_selector)
                     .next()
-                    .map(|e| e.attr("href").unwrap())
+                    .and_then(|e| e.attr("href"))
                     .unwrap_or_default()
                     .to_string(),
             ),
@@ -216,7 +239,7 @@ fn make_google_news(document: Html, subject: &String) -> Vec<NewNews> {
             news_link: Some(
                 news.select(&link_selector)
                     .next()
-                    .map(|e| e.attr("href").unwrap())
+                    .and_then(|e| e.attr("href"))
                     .map(|value| format!("https://news.google.com/{}", value))
                     .unwrap_or_default()
                     .to_string(),
