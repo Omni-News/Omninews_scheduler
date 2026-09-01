@@ -32,6 +32,9 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs \
  && cargo build --release \
  && rm -rf src target/release/OmniNews target/release/deps/OmniNews*
 
+# query! 매크로를 DB 없이 검증하기 위해 저장소의 쿼리 캐시를 쓴다.
+ENV SQLX_OFFLINE=1
+COPY .sqlx ./.sqlx
 COPY src ./src
 COPY Rocket.toml ./
 RUN cargo build --release
