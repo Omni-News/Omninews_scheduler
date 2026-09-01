@@ -22,13 +22,19 @@ pub async fn fetch_news_scheduler(pool: &MySqlPool) {
 
         // 뉴스 패치 중에는 fetch_flag를 false로 설정
         // 비동기 함수에 Send 트레이트가 필요하므로, task::spawn_blocking을 사용하여 처리
-        task::spawn_blocking(move || {
+        match task::spawn_blocking(move || {
             let mut fetch_flag = FETCH_FLAG.lock().unwrap();
             *fetch_flag = false;
             news_info!("[Scheduler] Fetching news");
         })
         .await
-        .unwrap();
+        {
+            Ok(_) => (),
+            Err(e) => {
+                news_error!("[Scheduler] fetch_flag 갱신 실패: {:?}", e);
+                continue;
+            }
+        }
 
         match crate::service::news_service::crawl_news_and_store_every_5_minutes(pool).await {
             Ok(_) => {
