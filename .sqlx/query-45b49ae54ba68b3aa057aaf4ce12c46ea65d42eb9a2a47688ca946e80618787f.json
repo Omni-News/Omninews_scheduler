@@ -1,0 +1,34 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT u.user_email, u.user_fcm_token FROM user u\n        JOIN user_subscription_channel usc ON u.user_id = usc.user_id\n        WHERE usc.channel_id = ? AND u.user_fcm_token IS NOT NULL AND u.user_notification_push = true",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_email",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "user_fcm_token",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 1020
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "45b49ae54ba68b3aa057aaf4ce12c46ea65d42eb9a2a47688ca946e80618787f"
+}

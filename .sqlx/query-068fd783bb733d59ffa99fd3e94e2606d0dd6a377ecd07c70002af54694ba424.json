@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE embedding \n    SET embedding_value = ?\n    WHERE channel_id = ?;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "068fd783bb733d59ffa99fd3e94e2606d0dd6a377ecd07c70002af54694ba424"
+}

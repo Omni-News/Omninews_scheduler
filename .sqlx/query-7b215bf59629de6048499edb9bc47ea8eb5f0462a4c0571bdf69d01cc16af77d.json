@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "\n        SELECT news_id FROM news WHERE news_title = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "news_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | AUTO_INCREMENT",
+          "max_size": 11
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7b215bf59629de6048499edb9bc47ea8eb5f0462a4c0571bdf69d01cc16af77d"
+}

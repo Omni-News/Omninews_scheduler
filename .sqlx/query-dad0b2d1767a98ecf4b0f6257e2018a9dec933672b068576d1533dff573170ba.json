@@ -1,0 +1,74 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT * from embedding WHERE channel_id IS NOT NULL AND rss_id IS NULL AND news_id IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "embedding_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | AUTO_INCREMENT",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "embedding_value",
+        "type_info": {
+          "type": "Blob",
+          "flags": "NOT_NULL | BLOB | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 65535
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "channel_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "UNIQUE_KEY",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "rss_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "UNIQUE_KEY",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "news_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "UNIQUE_KEY",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "embedding_source_rank",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 11
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "dad0b2d1767a98ecf4b0f6257e2018a9dec933672b068576d1533dff573170ba"
+}

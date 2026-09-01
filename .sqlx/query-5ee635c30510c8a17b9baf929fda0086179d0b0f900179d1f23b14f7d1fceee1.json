@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "INSERT INTO embedding (embedding_value, channel_id, rss_id, news_id, embedding_source_rank) VALUES (?, ?, ?, ?, ?);",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "5ee635c30510c8a17b9baf929fda0086179d0b0f900179d1f23b14f7d1fceee1"
+}

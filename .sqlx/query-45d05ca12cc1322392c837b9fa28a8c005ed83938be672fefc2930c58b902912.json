@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT channel_rss_link FROM rss_channel WHERE rss_generator not like '%Omninews%'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "channel_rss_link",
+        "type_info": {
+          "type": "VarString",
+          "flags": "UNIQUE_KEY",
+          "max_size": 2000
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "45d05ca12cc1322392c837b9fa28a8c005ed83938be672fefc2930c58b902912"
+}
