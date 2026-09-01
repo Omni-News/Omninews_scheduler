@@ -25,7 +25,7 @@ jobs:
 
           RUN apt-get update && apt-get install -y --no-install-recommends \
                 python3 python3-pip python3-venv \
-                g++ \
+                g++ libgfortran5 \
                 pkg-config libssl-dev libgomp1 ca-certificates \
               && rm -rf /var/lib/apt/lists/*
 
@@ -39,12 +39,20 @@ jobs:
            && /opt/venv/bin/pip install --no-cache-dir torch==2.4.0
 
           # 기존 Dockerfile과 같은 경로로 맞춰 둔다.
-          RUN ln -s "$(/opt/venv/bin/python -c 'import torch,os;print(os.path.dirname(torch.__file__))')" /opt/libtorch \
-           && ls -la /opt/libtorch/lib/libtorch.so /opt/libtorch/lib/libtorch_cpu.so
+          RUN TORCH_DIR="$(/opt/venv/bin/python -c 'import torch,os;print(os.path.dirname(torch.__file__))')" \
+           && ln -s "$TORCH_DIR" /opt/libtorch \
+           && ln -s "$(dirname "$TORCH_DIR")/torch.libs" /opt/torch-libs \
+           && ls -la /opt/libtorch/lib/libtorch_cpu.so \
+           && ls /opt/torch-libs | head
 
           ENV LIBTORCH=/opt/libtorch
-          ENV LD_LIBRARY_PATH=/opt/libtorch/lib
+          # wheel의 번들 라이브러리(openblas, gfortran)가 여기 들어 있다.
+          ENV LD_LIBRARY_PATH=/opt/libtorch/lib:/opt/torch-libs
           ENV LIBTORCH_BYPASS_VERSION_CHECK=1
+          # PyPI wheel은 manylinux 호환을 위해 pre-CXX11 ABI로 빌드된다.
+          # torch-sys가 기본값인 ABI=1로 컴파일하면 심볼이 어긋난다.
+          ENV LIBTORCH_CXX11_ABI=0
+          ENV RUSTFLAGS="-L/opt/torch-libs" 
 
           WORKDIR /probe
           RUN cargo init --name probe .
