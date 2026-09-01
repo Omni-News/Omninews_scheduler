@@ -28,9 +28,10 @@ jobs:
 
           # PyTorch는 linux/arm64용 libtorch C++ zip을 배포하지 않는다.
           # pip wheel 안에 완전한 libtorch가 들어 있으므로 그것을 쓴다.
+          # download.pytorch.org/whl/cpu 인덱스는 arm64를 2.6.0부터만 제공한다.
+          # aarch64에는 CUDA 빌드가 없어 PyPI wheel이 곧 CPU 버전이므로 그쪽에서 받는다.
           RUN python3 -m venv /opt/venv \
-           && /opt/venv/bin/pip install --no-cache-dir \
-                torch==2.4.0 --index-url https://download.pytorch.org/whl/cpu
+           && /opt/venv/bin/pip install --no-cache-dir torch==2.4.0
 
           # 기존 Dockerfile과 같은 경로로 맞춰 둔다.
           RUN ln -s "$(/opt/venv/bin/python -c 'import torch,os;print(os.path.dirname(torch.__file__))')" /opt/libtorch \
