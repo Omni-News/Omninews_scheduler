@@ -18,6 +18,7 @@ src/bindings.rs
 
 # log
 *.log
+logs/
 
 # annoy
 *.ann
