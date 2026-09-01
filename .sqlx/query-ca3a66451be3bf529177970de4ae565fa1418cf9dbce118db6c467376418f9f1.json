@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT channel_id FROM rss_channel WHERE channel_link = ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "channel_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | AUTO_INCREMENT",
+          "max_size": 11
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ca3a66451be3bf529177970de4ae565fa1418cf9dbce118db6c467376418f9f1"
+}

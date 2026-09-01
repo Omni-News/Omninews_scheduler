@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT rss_item.rss_title FROM rss_item WHERE rss_link=?;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rss_title",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 800
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "cd214d9e3d07b15eb94ae288ecdc6c3bd0a92d9da4401e656f1252bb0c9e44b8"
+}

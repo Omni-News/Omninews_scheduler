@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n        DELETE FROM news WHERE news_pub_date < DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "d069ef5bcf1241675b13c3c2a1610112226f265d136e56af19e5e5737a2093ea"
+}

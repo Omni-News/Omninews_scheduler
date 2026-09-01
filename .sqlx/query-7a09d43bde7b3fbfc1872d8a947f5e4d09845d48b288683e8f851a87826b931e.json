@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE rss_channel\n        SET channel_title = ?, channel_description = ?, channel_link = ?, channel_image_url = ?, channel_language = ?, rss_generator = ?, channel_rank = ? \n        WHERE channel_id = ?;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "7a09d43bde7b3fbfc1872d8a947f5e4d09845d48b288683e8f851a87826b931e"
+}

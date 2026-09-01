@@ -25,3 +25,5 @@ logs/
 
 # firebase
 omninews_firebase_sdk.json
+
+# SQLx 쿼리 캐시는 DB 없이 빌드하기 위해 저장소에 둔다 (무시하지 않음)
