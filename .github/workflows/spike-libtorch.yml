@@ -1,0 +1,58 @@
+# 임시 검증용 워크플로 — libtorch arm64 조달 가능 여부만 확인한다.
+# 확인이 끝나면 삭제한다. 수동 실행 전용이라 push로는 돌지 않는다.
+name: (spike) libtorch arm64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: probe libtorch on arm64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Probe
+        run: |
+          set -euxo pipefail
+          cat > Dockerfile.spike <<'DOCKER'
+          FROM rust:1.89-slim
+
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+                python3 python3-pip python3-venv \
+                pkg-config libssl-dev libgomp1 ca-certificates \
+              && rm -rf /var/lib/apt/lists/*
+
+          # PyTorch는 linux/arm64용 libtorch C++ zip을 배포하지 않는다.
+          # pip wheel 안에 완전한 libtorch가 들어 있으므로 그것을 쓴다.
+          RUN python3 -m venv /opt/venv \
+           && /opt/venv/bin/pip install --no-cache-dir \
+                torch==2.4.0 --index-url https://download.pytorch.org/whl/cpu
+
+          # 기존 Dockerfile과 같은 경로로 맞춰 둔다.
+          RUN ln -s "$(/opt/venv/bin/python -c 'import torch,os;print(os.path.dirname(torch.__file__))')" /opt/libtorch \
+           && ls -la /opt/libtorch/lib/libtorch.so /opt/libtorch/lib/libtorch_cpu.so
+
+          ENV LIBTORCH=/opt/libtorch
+          ENV LD_LIBRARY_PATH=/opt/libtorch/lib
+          ENV LIBTORCH_BYPASS_VERSION_CHECK=1
+
+          WORKDIR /probe
+          RUN cargo init --name probe .
+          RUN cargo add tch@0.17
+          RUN cat > src/main.rs <<'RS'
+          fn main() {
+              let t = tch::Tensor::from_slice(&[1.0f32, 2.0, 3.0]);
+              println!("libtorch OK: sum={:?}", t.sum(tch::Kind::Float).double_value(&[]));
+          }
+          RS
+          RUN cargo build --release
+          RUN ./target/release/probe
+          DOCKER
+
+          docker build -f Dockerfile.spike -t libtorch-probe .
+          echo "=== 컨테이너에서 재실행 ==="
+          docker run --rm libtorch-probe
