@@ -4,7 +4,7 @@
 
 ## 개요
 
-Omninews Scheduler는 다양한 RSS 채널과 네이버 뉴스로부터 뉴스 아이템을 자동으로 수집하고, AI 요약을 통해 데이터베이스에 저장하며, 구독자에게 푸시 알림을 전송하는 Rust 기반 스케줄러입니다.
+Omninews Scheduler는 다양한 RSS 채널과 네이버 뉴스로부터 뉴스 아이템을 자동으로 수집해 데이터베이스에 저장하며, 구독자에게 푸시 알림을 전송하는 Rust 기반 스케줄러입니다.
 
 - **웹사이트**: https://kang1027.com/omninews
 - **App Store**: https://apps.apple.com/kr/app/omninews/id6746567181?l=en-GB
@@ -14,7 +14,6 @@ Omninews Scheduler는 다양한 RSS 채널과 네이버 뉴스로부터 뉴스 �
 - **RSS 피드 수집**: 데이터베이스에 저장된 RSS 채널들의 아이템을 비동기로 가져와 저장
 - **다양한 피드 포맷 지원**: RSS 2.0, Atom 등 주요 피드 포맷 모두 지원
 - **네이버 뉴스 스크래핑**: Selenium을 활용한 네이버 뉴스 자동 수집
-- **AI 기반 요약**: Google Gemini 2.0 Flash 모델을 활용한 뉴스 요약
 - **스마트 푸시 알림**: 구독한 RSS 채널에 새로운 글이 올라왔을 때 실시간 알림 전송
 - **비동기 처리**: Tokio 런타임을 활용한 효율적인 비동기 작업 처리
 
@@ -26,7 +25,6 @@ Omninews Scheduler는 다양한 RSS 채널과 네이버 뉴스로부터 뉴스 �
 - **데이터베이스**: MySQL (with SQLx)
 - **RSS 파싱**: feed-rs, rss
 - **웹 스크래핑**: Selenium (thirtyfour), scraper
-- **AI 모델**: Google Gemini 2.0 Flash
 - **인증**: JWT (jsonwebtoken)
 
 ## 설치 및 실행
@@ -63,10 +61,6 @@ cp .env.example .env
 **Naver API**
 - `NAVER_CLIENT_ID`: 네이버 개발자 센터에서 발급받은 Client ID
 - `NAVER_CLIENT_SECRET`: 네이버 개발자 센터에서 발급받은 Client Secret
-
-**Gemini API**
-- `GEMINI_API_KEY`: Google AI Studio에서 발급받은 Gemini API 키
-  - 뉴스 요약에 사용됩니다
 
 **Apple App Store** (푸시 알림용)
 - `APPLE_PRIVATE_KEY`: App Store Connect에서 생성한 Private Key

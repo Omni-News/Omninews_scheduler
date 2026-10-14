@@ -5,10 +5,8 @@ use crate::{
     model::{error::OmniNewsError, news::NewNews},
     news_error, news_info, news_warn,
     repository::news_repository,
-    utils::api::query_gemini_summarize,
 };
 use chrono::{Duration, FixedOffset, NaiveDateTime, Utc};
-use regex::Regex;
 use reqwest::Client;
 use scraper::{Html, Selector};
 use sqlx::MySqlPool;
@@ -96,13 +94,10 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
                 }
             };
 
-            let news_link = match news.news_link.clone().filter(|link| !link.is_empty()) {
-                Some(link) => link,
-                None => {
-                    news_warn!("[Service] Skip news without link: {:?}", news);
-                    continue;
-                }
-            };
+            if news.news_link.as_deref().is_none_or(str::is_empty) {
+                news_warn!("[Service] Skip news without link: {:?}", news);
+                continue;
+            }
 
             match news_repository::select_news_by_title(pool, news_title).await {
                 Ok(_) => (),
@@ -112,22 +107,8 @@ async fn fetch_news_and_store(pool: &MySqlPool, news_type: NewsType) -> Result<(
                         continue;
                     }
 
-                    match summarize_news(
-                        news_link.as_str(),
-                        news.news_description.clone().unwrap().as_str(),
-                    )
-                    .await
-                    {
-                        Ok(res) => {
-                            news.news_summary = Some(res);
-                        }
-                        Err(e) => {
-                            // 요약 실패 시 기본 설명으로 넣음.
-                            news_warn!("[Service] Failed to summarize news. {}", e);
-                            news.news_summary =
-                                Some(news.news_description.clone().unwrap_or_default());
-                        }
-                    }
+                    // 요약 모델을 쓰지 않으므로 기본 설명을 요약으로 넣음.
+                    news.news_summary = Some(news.news_description.clone().unwrap_or_default());
 
                     let _ = news_repository::insert_news(pool, news.clone())
                         .await
@@ -316,62 +297,4 @@ fn pub_date_to_naive_time(pub_date: String) -> Option<NaiveDateTime> {
     } else {
         None
     }
-}
-
-// 뉴스는 약 3000자 미만만 요약시킴.
-// 뉴스가 너무 많이 올라올 때 어떻게 할지 금액 보면서 조치하기.
-// 10/15 하루에 33만원나옴 ㅋ;
-async fn summarize_news(news_link: &str, news_description: &str) -> Result<String, OmniNewsError> {
-    if news_link.contains("google.com") {
-        // 구글 뉴스는 요약하지 않음.
-        return Ok(news_description.into());
-    }
-    let client = Client::new();
-
-    let res = client.get(news_link).send().await?.text().await?;
-
-    // HTML 파싱 동기 작업을 spawn_blocking으로 감싸서 별도 스레드에서 실행
-    let content = task::spawn_blocking(move || {
-        let document = Html::parse_document(&res);
-        let news_selector = Selector::parse("#dic_area").unwrap();
-
-        document
-            .select(&news_selector)
-            .next()
-            .map(|element| {
-                // <br> 태그를 줄바꿈으로 변환
-                let html_with_newlines =
-                    element.html().replace("<br>", "\n").replace("<br/>", "\n");
-
-                // 모든 HTML 태그 제거
-                let re = Regex::new(r"<[^>]*>").unwrap();
-                let text = re.replace_all(&html_with_newlines, "");
-
-                // HTML 엔티티 디코딩
-                let decoded = html_escape::decode_html_entities(&text);
-
-                // 연속된 공백과 줄바꿈 정리
-                decoded
-                    .split('\n')
-                    .map(|line| line.trim())
-                    .filter(|line| !line.is_empty())
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            })
-            .unwrap_or_default()
-    })
-    .await
-    .map_err(|e| {
-        news_error!("[Service] spawn_blocking failed: {:?}", e);
-        OmniNewsError::FetchNews
-    })?;
-
-    // 너무 긴 뉴스는 (약 3000자) 요약 X
-    if content.len() > 5000 {
-        return Ok(news_description.into());
-    }
-
-    let summary = query_gemini_summarize(50, &content).await;
-
-    Ok(summary)
 }
