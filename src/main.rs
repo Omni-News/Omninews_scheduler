@@ -38,8 +38,7 @@ async fn start_scheduler(
     driver_pool: &DriverPool,
 ) {
     use scheduler::{
-        annoy_scheduler::*, news_scheduler::*, rss_info_update_scheduler::*,
-        rss_notification_scheduler::*,
+        news_scheduler::*, rss_info_update_scheduler::*, rss_notification_scheduler::*,
     };
     sleep(Duration::from_secs(10)).await; // 서버 시작 후 10초 대기
 
@@ -48,8 +47,6 @@ async fn start_scheduler(
         delete_old_news_scheduler(pool),
         // 5분마다 뉴스 패치
         fetch_news_scheduler(pool),
-        // 1시간마다 Annoy 인덱스 저장
-        save_annoy_scheduler(pool),
         // TODO: 아래 두개는 잘되는지 검증은 실사용 해보면서 하기.
         // 10분마다 RSS 아이템 패치 및 채널 구독자에게 알림
         rss_fetch_and_notification_scheduler(pool, embedding_service, driver_pool),
