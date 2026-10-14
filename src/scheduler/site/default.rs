@@ -9,11 +9,10 @@ use thirtyfour::{error::WebDriverResult, WebDriver};
 use crate::config::webdriver::{AcquireStrategy, DriverPool};
 use crate::model::rss::{CreatedRssItem, NewRssItem};
 use crate::service::rss::{channel_service, item_service};
-use crate::{model::error::OmniNewsError, utils::embedding_util::EmbeddingService};
+use crate::model::error::OmniNewsError;
 
 pub async fn update_default_channel_info(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver_pool: &DriverPool,
     link: &str,
 ) -> Result<i32, OmniNewsError> {
@@ -61,14 +60,7 @@ pub async fn update_default_channel_info(
         };
 
         let channel_id = channel_service::get_channel_id_by_rss_link(pool, &rss_link).await?;
-        match channel_service::update_rss_channel_and_embedding(
-            pool,
-            embedding_service,
-            &update_rss,
-            channel_id,
-        )
-        .await
-        {
+        match channel_service::update_rss_channel(pool, &update_rss, channel_id).await {
             Ok(_) => info!(
                 "[Scheduler] Rss Information Update Scheduler updated: {}",
                 rss_link
@@ -92,7 +84,6 @@ pub async fn update_default_channel_info(
 
 pub async fn fetch_default_rss_and_store(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver_pool: &DriverPool,
     channel_link: &str,
     channel_id: i32,
@@ -132,9 +123,7 @@ pub async fn fetch_default_rss_and_store(
 
             let rss_pub_date = item_service::parse_pub_date(item.pub_date());
             let new_item = NewRssItem::new(channel_id, item, rss_pub_date, "".to_string());
-            match item_service::create_rss_item_and_embedding(pool, embedding_service, new_item)
-                .await
-            {
+            match item_service::create_rss_item(pool, new_item).await {
                 Ok(created_item) => {
                     let item_title = created_item.rss_title.clone();
                     items.push(created_item);

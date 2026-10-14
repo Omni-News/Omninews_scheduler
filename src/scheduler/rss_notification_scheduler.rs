@@ -28,24 +28,20 @@ use crate::{
     service::{
         rss::{
             channel_service::{self, parse_rss_link_to_channel},
-            item_service::{self, create_rss_item_and_embedding, parse_pub_date},
+            item_service::{self, create_rss_item, parse_pub_date},
         },
         user_service,
     },
-    utils::{embedding_util::EmbeddingService, firebase::send_fcm::send_fcm_message},
+    utils::firebase::send_fcm::send_fcm_message,
 };
-pub async fn rss_fetch_and_notification_scheduler(
-    pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
-    driver_pool: &DriverPool,
-) {
+pub async fn rss_fetch_and_notification_scheduler(pool: &MySqlPool, driver_pool: &DriverPool) {
     let mut interval = interval_at(Instant::now(), Duration::from_secs(60 * 10));
 
     loop {
         interval.tick().await;
         rss_fetch_and_notification_info!("[Scheduler] Rss Notification Scheduler started");
         // default
-        match fetch_default_rss_and_store(pool, embedding_service).await {
+        match fetch_default_rss_and_store(pool).await {
             Ok(res) => res,
             Err(e) => {
                 rss_fetch_and_notification_error!(
@@ -57,13 +53,7 @@ pub async fn rss_fetch_and_notification_scheduler(
         };
 
         // instagram or default using webdriver
-        match fetch_webdriver_rss_and_store_and_send_notification(
-            pool,
-            embedding_service,
-            driver_pool,
-        )
-        .await
-        {
+        match fetch_webdriver_rss_and_store_and_send_notification(pool, driver_pool).await {
             Ok(_) => (),
             Err(e) => {
                 rss_fetch_and_notification_error!(
@@ -76,10 +66,7 @@ pub async fn rss_fetch_and_notification_scheduler(
 }
 
 //TODO:  이제 이게 default고, webdriver사용하는 것 만들기
-pub async fn fetch_default_rss_and_store(
-    pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
-) -> Result<(), OmniNewsError> {
+pub async fn fetch_default_rss_and_store(pool: &MySqlPool) -> Result<(), OmniNewsError> {
     // loop for 10 minutes
 
     let rss_channels = channel_service::get_default_rss_channels(pool)
@@ -132,7 +119,7 @@ pub async fn fetch_default_rss_and_store(
                 rss_rank: Some(0),
                 rss_image_link: Some(channel_image_url.to_string()),
             };
-            match create_rss_item_and_embedding(pool, embedding_service, rss_item).await {
+            match create_rss_item(pool, rss_item).await {
                 Ok(created_item) => {
                     let item_title = created_item.rss_title.clone();
                     rss_fetch_and_notification_info!(
@@ -167,7 +154,6 @@ pub async fn fetch_default_rss_and_store(
 
 async fn fetch_webdriver_rss_and_store_and_send_notification(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver_pool: &DriverPool,
 ) -> Result<(), OmniNewsError> {
     // loop for 10 minutes
@@ -189,7 +175,6 @@ async fn fetch_webdriver_rss_and_store_and_send_notification(
             "instagram" => {
                 instagram::fetch_instagram_rss_and_store(
                     pool,
-                    embedding_service,
                     driver_pool,
                     &channel_link,
                     channel_id,
@@ -199,7 +184,6 @@ async fn fetch_webdriver_rss_and_store_and_send_notification(
             "default" => {
                 default::fetch_default_rss_and_store(
                     pool,
-                    embedding_service,
                     driver_pool,
                     &channel_link,
                     channel_id,

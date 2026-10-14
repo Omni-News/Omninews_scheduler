@@ -9,14 +9,9 @@ use crate::{
     rss_info_error, rss_info_info,
     scheduler::site::{default, instagram},
     service::rss::channel_service,
-    utils::embedding_util::EmbeddingService,
 };
 
-pub async fn rss_info_update_scheduler(
-    pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
-    driver_pool: &DriverPool,
-) {
+pub async fn rss_info_update_scheduler(pool: &MySqlPool, driver_pool: &DriverPool) {
     // 1 day
     let mut interval = interval_at(Instant::now(), Duration::from_secs(60 * 60 * 24));
 
@@ -39,16 +34,13 @@ pub async fn rss_info_update_scheduler(
          * 3. DB에 내용 업데이트.
          *
          */
-        let _ = update_channel_info_default(pool, embedding_service).await;
-        let _ = update_channel_info_webdriver(pool, embedding_service, driver_pool).await;
+        let _ = update_channel_info_default(pool).await;
+        let _ = update_channel_info_webdriver(pool, driver_pool).await;
         rss_info_info!("[Scheduler] Rss Information Update Scheduler ended");
     }
 }
 
-async fn update_channel_info_default(
-    pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
-) -> Result<bool, OmniNewsError> {
+async fn update_channel_info_default(pool: &MySqlPool) -> Result<bool, OmniNewsError> {
     let rss_links = channel_service::get_default_rss_links(pool).await?;
     for rss_link in &rss_links {
         let update_rss = match channel_service::get_rss_channel_by_parse(rss_link).await {
@@ -59,14 +51,7 @@ async fn update_channel_info_default(
             }
         };
         let channel_id = channel_service::get_channel_id_by_rss_link(pool, rss_link).await?;
-        match channel_service::update_rss_channel_and_embedding(
-            pool,
-            embedding_service,
-            &update_rss,
-            channel_id,
-        )
-        .await
-        {
+        match channel_service::update_rss_channel(pool, &update_rss, channel_id).await {
             Ok(_) => rss_info_info!(
                 "[Scheduler] Rss Information Update Scheduler updated: {}",
                 rss_link
@@ -85,7 +70,6 @@ async fn update_channel_info_default(
 // ex) instagram, default, etc.
 async fn update_channel_info_webdriver(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver_pool: &DriverPool,
 ) -> Result<bool, OmniNewsError> {
     let channels = channel_service::get_rss_channels_with_webdriver(pool).await?;
@@ -102,18 +86,12 @@ async fn update_channel_info_webdriver(
 
         match platform.as_str() {
             "instagram" => {
-                let _ = instagram::update_instagram_channel_info(
-                    pool,
-                    embedding_service,
-                    driver_pool,
-                    &channel,
-                )
-                .await?;
+                let _ =
+                    instagram::update_instagram_channel_info(pool, driver_pool, &channel).await?;
             }
             "default" => {
                 let _ = default::update_default_channel_info(
                     pool,
-                    embedding_service,
                     driver_pool,
                     &channel.channel_link.unwrap_or_default(),
                 )

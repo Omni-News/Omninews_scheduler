@@ -15,7 +15,6 @@ use std::time::Duration;
 use config::{env, logging};
 use sqlx::MySqlPool;
 use tokio::time::sleep;
-use utils::embedding_util::EmbeddingService;
 
 use crate::config::webdriver::{DriverPool, DriverPoolConfig};
 
@@ -25,18 +24,13 @@ async fn main() {
     logging::load_logger();
 
     let pool = db_util::create_pool().await;
-    let embedding_service = EmbeddingService::new();
     let dp_cfg = DriverPoolConfig::default();
     let driver_pool = DriverPool::new(dp_cfg);
 
-    start_scheduler(&pool, &embedding_service, &driver_pool).await;
+    start_scheduler(&pool, &driver_pool).await;
 }
 
-async fn start_scheduler(
-    pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
-    driver_pool: &DriverPool,
-) {
+async fn start_scheduler(pool: &MySqlPool, driver_pool: &DriverPool) {
     use scheduler::{
         news_scheduler::*, rss_info_update_scheduler::*, rss_notification_scheduler::*,
     };
@@ -49,8 +43,8 @@ async fn start_scheduler(
         fetch_news_scheduler(pool),
         // TODO: 아래 두개는 잘되는지 검증은 실사용 해보면서 하기.
         // 10분마다 RSS 아이템 패치 및 채널 구독자에게 알림
-        rss_fetch_and_notification_scheduler(pool, embedding_service, driver_pool),
+        rss_fetch_and_notification_scheduler(pool, driver_pool),
         // 매일 RSS 채널 정보 업데이트
-        rss_info_update_scheduler(pool, embedding_service, driver_pool),
+        rss_info_update_scheduler(pool, driver_pool),
     );
 }

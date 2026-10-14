@@ -12,9 +12,6 @@ pub enum OmniNewsError {
     #[error("Failed to parse RSS feed")]
     ParseRssChannel,
 
-    #[error("Failed to embedding sentence")]
-    Embedding,
-
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 

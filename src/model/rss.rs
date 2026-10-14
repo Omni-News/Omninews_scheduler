@@ -3,13 +3,7 @@ use std::collections::BTreeMap;
 use chrono::NaiveDateTime;
 use rss::Item;
 
-#[derive(Debug, Clone)]
-pub enum NewticleType {
-    Channel,
-    Rss,
-    News,
-}
-
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct NewRssChannel {
     pub channel_title: Option<String>,

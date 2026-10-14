@@ -14,12 +14,10 @@ use crate::{
         rss::{CreatedRssItem, NewRssChannel, NewRssItem, RssChannel},
     },
     service::rss::{channel_service, item_service},
-    utils::embedding_util::EmbeddingService,
 };
 
 pub async fn update_instagram_channel_info(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver_pool: &DriverPool,
     channel: &RssChannel,
 ) -> Result<i32, OmniNewsError> {
@@ -48,8 +46,7 @@ pub async fn update_instagram_channel_info(
 
     let channel_id;
     if is_sign_in {
-        channel_id =
-            update_channel_info(pool, embedding_service, driver, &instagram_channel_link).await?;
+        channel_id = update_channel_info(pool, driver, &instagram_channel_link).await?;
     } else {
         // 로그인
         let _ = driver
@@ -59,16 +56,12 @@ pub async fn update_instagram_channel_info(
         sleep(Duration::from_millis(1000)).await;
         if is_login_page(driver).await? {
             attempt_login(driver).await?;
-            channel_id =
-                update_channel_info(pool, embedding_service, driver, &instagram_channel_link)
-                    .await?;
+            channel_id = update_channel_info(pool, driver, &instagram_channel_link).await?;
         } else {
             // 혹시 로그인 유도 모달(닫기 버튼) 존재시 닫기 (한국어/영어 모두 대응)
             error!("여기오면ㅇ ㅏㄴ됨.");
             dismiss_close_overlay(driver).await.ok();
-            channel_id =
-                update_channel_info(pool, embedding_service, driver, &instagram_channel_link)
-                    .await?;
+            channel_id = update_channel_info(pool, driver, &instagram_channel_link).await?;
         }
     }
     Ok(channel_id)
@@ -76,7 +69,6 @@ pub async fn update_instagram_channel_info(
 
 async fn update_channel_info(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver: &WebDriver,
     link: &str,
 ) -> Result<i32, OmniNewsError> {
@@ -100,21 +92,14 @@ async fn update_channel_info(
         channel.channel_rss_link.unwrap_or_default(),
     );
 
-    match channel_service::update_rss_channel_and_embedding(
-        pool,
-        embedding_service,
-        &updated_rss_channel,
-        channel_id,
-    )
-    .await
-    {
+    match channel_service::update_rss_channel(pool, &updated_rss_channel, channel_id).await {
         Ok(_) => info!(
-            "[Service-instagram] Updated channel info and embedding for link: {}",
+            "[Service-instagram] Updated channel info for link: {}",
             link
         ),
         Err(e) => {
             error!(
-                "[Service-instagram] Failed to update channel info and embedding for link: {}, error: {:?}",
+                "[Service-instagram] Failed to update channel info for link: {}, error: {:?}",
                 link, e
             );
             return Err(e);
@@ -126,7 +111,6 @@ async fn update_channel_info(
 
 pub async fn fetch_instagram_rss_and_store(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver_pool: &DriverPool,
     link: &str,
     channel_id: i32,
@@ -155,14 +139,8 @@ pub async fn fetch_instagram_rss_and_store(
 
     let created_items: Vec<CreatedRssItem>;
     if is_sign_in {
-        created_items = fetch_rss_and_store_new_feeds(
-            pool,
-            embedding_service,
-            driver,
-            feeds_graphql_url,
-            channel_id,
-        )
-        .await?;
+        created_items =
+            fetch_rss_and_store_new_feeds(pool, driver, feeds_graphql_url, channel_id).await?;
     } else {
         // 로그인
         info!("[OInstagram-fetch] Sign in...");
@@ -178,14 +156,8 @@ pub async fn fetch_instagram_rss_and_store(
             attempt_login(driver).await?;
             sleep(Duration::from_millis(3000)).await;
             info!("[Instagram-fetch] login success");
-            created_items = fetch_rss_and_store_new_feeds(
-                pool,
-                embedding_service,
-                driver,
-                feeds_graphql_url,
-                channel_id,
-            )
-            .await?;
+            created_items =
+                fetch_rss_and_store_new_feeds(pool, driver, feeds_graphql_url, channel_id).await?;
         } else {
             warn!("여기오면안됨.");
             // 혹시 로그인 유도 모달(닫기 버튼) 존재시 닫기 (한국어/영어 모두 대응)
@@ -199,7 +171,6 @@ pub async fn fetch_instagram_rss_and_store(
 
 async fn fetch_rss_and_store_new_feeds(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     driver: &WebDriver,
     feeds_graphql_url: String,
     channel_id: i32,
@@ -223,16 +194,12 @@ async fn fetch_rss_and_store_new_feeds(
 
             let mut created_items = Vec::new();
             for item in new_items {
-                let created_item =
-                    item_service::create_rss_item_and_embedding(pool, embedding_service, item)
-                        .await
-                        .map_err(|e| {
-                            error!(
-                                "[Service-instagram] Failed to create rss item and embedding: {:?}",
-                                e
-                            );
-                            e
-                        });
+                let created_item = item_service::create_rss_item(pool, item)
+                    .await
+                    .map_err(|e| {
+                        error!("[Service-instagram] Failed to create rss item: {:?}", e);
+                        e
+                    });
                 if let Ok(created_item) = created_item {
                     created_items.push(created_item);
                 }

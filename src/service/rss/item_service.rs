@@ -1,22 +1,18 @@
 use crate::{
     model::{
-        embedding::NewEmbedding,
         error::OmniNewsError,
         rss::{CreatedRssItem, NewRssItem},
     },
     repository::rss_item_repository,
     rss_fetch_and_notification_error, rss_fetch_and_notification_warn,
-    service::embedding_service,
-    utils::embedding_util::EmbeddingService,
 };
 use chrono::FixedOffset;
 use chrono::{DateTime, NaiveDateTime};
 use scraper::{Html, Selector};
 use sqlx::MySqlPool;
 
-pub async fn create_rss_item_and_embedding(
+pub async fn create_rss_item(
     pool: &MySqlPool,
-    embedding_service: &EmbeddingService,
     mut rss_item: NewRssItem,
 ) -> Result<CreatedRssItem, OmniNewsError> {
     if rss_item.rss_title.is_none() {
@@ -39,22 +35,6 @@ pub async fn create_rss_item_and_embedding(
 
     truncate_rss_description(&mut rss_item);
     let item_id = store_rss_item(pool, rss_item.clone()).await?;
-
-    let sentence = format!(
-        "{}\n{}\n{}",
-        rss_item.rss_title.as_deref().unwrap_or_default(),
-        extracted_description,
-        rss_item.rss_author.as_deref().unwrap_or_default()
-    );
-    let embedding = NewEmbedding {
-        embedding_value: None,
-        channel_id: None,
-        rss_id: Some(item_id),
-        news_id: None,
-        embedding_source_rank: Some(0),
-    };
-
-    embedding_service::create_embedding(pool, embedding_service, sentence, embedding).await?;
     Ok(CreatedRssItem::from_new(item_id, rss_item))
 }
 
